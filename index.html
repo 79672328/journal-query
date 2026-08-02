@@ -203,24 +203,40 @@ function searchJournals(query) {
   const results = [];
   const byIssn = q.replace(/[^0-9]/g, '');
   
+  // Build query variants: original, without prefixes like "npj " / "the "
+  const queries = [q];
+  const noPrefix = q.replace(/^(npj|the|journal of|international journal of)\s+/i, '').trim();
+  if (noPrefix && noPrefix !== q) queries.push(noPrefix);
+  
   for (const j of STATE.journals) {
     const name = (j[0] || '').toLowerCase();
     const issn = (j[1] || '').replace(/-/g, '');
     
-    // Match by name (substring) or ISSN
-    if (name.includes(q) || (byIssn && issn.includes(byIssn))) {
+    // Match by any query variant
+    let matched = false;
+    for (const qv of queries) {
+      if (name.includes(qv)) { matched = true; break; }
+    }
+    if (!matched && byIssn && issn.includes(byIssn)) matched = true;
+    
+    // Word-by-word fallback (less strict): all significant words must appear
+    if (!matched && queries[0].split(/\s+/).filter(w => w.length > 2).every(w => name.includes(w))) {
+      matched = true;
+    }
+    
+    if (matched) {
       results.push(j);
       if (results.length >= 20) break;
     }
   }
   
-  // Sort: exact starts-with first, then contains
+  // Sort: exact starts-with first, then contains, then word-match
   results.sort((a, b) => {
     const aName = (a[0] || '').toLowerCase();
     const bName = (b[0] || '').toLowerCase();
-    const aStarts = aName.startsWith(q) ? 0 : 1;
-    const bStarts = bName.startsWith(q) ? 0 : 1;
-    if (aStarts !== bStarts) return aStarts - bStarts;
+    const aExact = aName.startsWith(q) ? 0 : 1;
+    const bExact = bName.startsWith(q) ? 0 : 1;
+    if (aExact !== bExact) return aExact - bExact;
     // Then by IF desc
     return (b[3] || 0) - (a[3] || 0);
   });
@@ -296,9 +312,29 @@ async function parsePdf(file) {
       if (doiMatch) doi = doiMatch[0];
     }
     
+    // Extract journal name from multiple possible metadata fields
+    // /Subject often contains "Journal Name, doi:..." (Springer/Elsevier PDFs)
+    let journal = info['Journal'] || info['Container-title'] || info['PrismPublicationName'] || '';
+    let subjectJournal = '';
+    if (!journal && info.Subject) {
+      // Subject format: "npj Materials Sustainability, doi:10.1038/..."
+      const subjParts = info.Subject.split(',');
+      const firstPart = subjParts[0].trim();
+      // Check if it looks like a journal name (not a DOI)
+      if (firstPart && !firstPart.startsWith('doi:') && !/^10\.\d{4,}\//.test(firstPart)) {
+        subjectJournal = firstPart;
+        journal = firstPart;
+      }
+      // Also check if Subject contains a DOI
+      if (!doi) {
+        const subjDoi = info.Subject.match(/10\.\d{4,}\/[\w.\-+/()]+/i);
+        if (subjDoi) doi = subjDoi[0];
+      }
+    }
+    
     return {
       title: info.Title || '',
-      journal: info['Journal'] || info['Container-title'] || info['PrismPublicationName'] || '',
+      journal: journal,
       issn: info.ISSN || '',
       doi: doi || ''
     };
@@ -309,10 +345,53 @@ async function parsePdf(file) {
 }
 
 // ==================== Render ====================
-function showResults(matches, source = '', pdfInfo = null) {
+function showResults(matches, source = '', unknownJournal = null) {
   const el = $('results');
   el.innerHTML = '';
   
+  // Case: no matches in database, but we identified a journal via CrossRef
+  if (!matches.length && unknownJournal) {
+    $('emptyState').classList.add('hidden');
+    const jn = esc(unknownJournal.journal || unknownJournal.name || '');
+    const title = esc(unknownJournal.title || '');
+    const doi = esc(unknownJournal.doi || '');
+    
+    let html = `<div class="result-card" style="border-left:3px solid #e67e22">
+      <div class="result-title">${jn || '未知期刊'}</div>
+      <div class="result-issn">${doi ? 'DOI: ' + doi : ''}</div>`;
+    if (title) html += `<div style="font-size:12px;color:var(--sub);margin-bottom:12px;line-height:1.4">${title}</div>`;
+    
+    html += `<div class="result-grid">
+      <div class="result-item">
+        <div class="label">JCR分区</div>
+        <div class="value" style="font-size:14px;color:#e67e22">暂未收录</div>
+      </div>
+      <div class="result-item">
+        <div class="label">影响因子</div>
+        <div class="value" style="font-size:14px;color:var(--sub)">-</div>
+      </div>
+      <div class="result-item">
+        <div class="label">新锐大类</div>
+        <div class="value" style="font-size:12px;color:var(--sub)">暂未收录</div>
+      </div>
+      <div class="result-item">
+        <div class="label">新锐分区</div>
+        <div class="value" style="font-size:12px;color:var(--sub)">-</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;padding:8px 10px;background:#fef9f0;border-radius:8px;font-size:12px;color:#b87333;line-height:1.5">
+      该期刊暂未被JCR或新锐分区数据库收录。可能是新创期刊或尚未被索引。
+    </div></div>`;
+    
+    if (source) {
+      el.innerHTML = `<div style="font-size:12px;color:var(--sub);margin-bottom:8px">${source}</div>` + html;
+    } else {
+      el.innerHTML = html;
+    }
+    return;
+  }
+  
+  // Case: no matches at all
   if (!matches.length) {
     el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到匹配的期刊<br>请尝试用ISSN或完整期刊名搜索</div></div>`;
     $('emptyState').classList.add('hidden');
@@ -458,7 +537,12 @@ async function doDoiSearch(doi) {
   }
   
   const source = info.title ? `📄 ${esc(info.title)}<br>DOI: ${esc(doi)}` : `DOI: ${esc(doi)}`;
-  showResults(matches, source);
+  if (!matches.length) {
+    // Show partial result when journal is identified but not in database
+    showResults([], source, { journal: info.journal, title: info.title, doi: info.doi });
+  } else {
+    showResults(matches, source);
+  }
 }
 
 // PDF upload
@@ -513,13 +597,24 @@ async function processPdf(file) {
       if (!matches.length && crossrefInfo.issn) {
         matches = searchJournals(crossrefInfo.issn);
       }
+      // If still no match, prepare to show partial result
+      if (!matches.length) {
+        showResults([], source, crossrefInfo);
+        $('pdfInput').value = '';
+        return;
+      }
     }
   }
   
-  // Fallback to journal name
+  // Fallback to journal name from PDF metadata
   if (!matches.length && info.journal) {
     source = `PDF提取: ${esc(info.journal)}`;
     matches = searchJournals(info.journal);
+    if (!matches.length) {
+      showResults([], source, { journal: info.journal, title: info.title, doi: info.doi });
+      $('pdfInput').value = '';
+      return;
+    }
   }
   
   if (!matches.length && info.issn) {
@@ -527,9 +622,15 @@ async function processPdf(file) {
     source += ` (ISSN: ${info.issn})`;
   }
   
+  if (!matches.length) {
+    showResults([], source, info);
+    $('pdfInput').value = '';
+    return;
+  }
+  
   if (info.title) source += `<br>${esc(info.title)}`;
   
-  showResults(matches, source, info);
+  showResults(matches, source);
   $('pdfInput').value = '';
 }
 
