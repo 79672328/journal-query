@@ -194,36 +194,29 @@ function loadPdfJs() {
 // ==================== App State ====================
 const STATE = {
   journals: [],
+  namesLower: [],
+  total: 0,
+  updated: '',
   loaded: false,
-  mode: 'name',
-  searching: false
+  mode: 'name'
 };
 
 // ==================== Data Loading ====================
 async function loadData() {
   try {
-    $('stats').textContent = '正在加载数据库...';
+    $('stats').textContent = '加载数据库...';
     const resp = await fetch('journal_data.json.gz');
     if (!resp.ok) throw new Error('Data fetch failed');
-    // Read with progress
-    const reader = resp.body.getReader();
-    const chunks = [];
-    let received = 0;
-    const total = parseInt(resp.headers.get('Content-Length') || '450000');
-    while (true) {
-      const {done, value} = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.length;
-      const pct = Math.round(received / total * 100);
-      $('stats').textContent = `加载数据库... ${pct}%`;
-    }
-    const blob = new Blob(chunks);
     const ds = new DecompressionStream('gzip');
-    const stream = blob.stream().pipeThrough(ds);
+    const stream = resp.body.pipeThrough(ds);
     const text = await new Response(stream).text();
+    $('stats').textContent = '解析数据...';
     const data = JSON.parse(text);
     STATE.journals = data.journals;
+    STATE.total = data.total;
+    STATE.updated = data.updated;
+    // Build search index: lowercase names for fast filtering
+    STATE.namesLower = STATE.journals.map(j => (j[0] || '').toLowerCase());
     STATE.loaded = true;
     $('stats').textContent = `已加载 ${data.total.toLocaleString()} 条期刊数据 · ${data.updated}`;
   } catch(e) {
@@ -237,54 +230,58 @@ async function loadData() {
 function searchJournals(query) {
   if (!query || query.length < 2) return [];
   const q = query.toLowerCase().trim();
-  const results = [];
   const byIssn = q.replace(/[^0-9]/g, '');
+  const names = STATE.namesLower;
+  const journals = STATE.journals;
+  const len = journals.length;
+  const results = [];
   
-  // Build query variants: original, without prefixes like "npj " / "the "
-  const queries = [q];
+  // Query variants
+  const qs = [q];
   const noPrefix = q.replace(/^(npj|the|journal of|international journal of)\s+/i, '').trim();
-  if (noPrefix && noPrefix !== q) queries.push(noPrefix);
+  if (noPrefix && noPrefix !== q) qs.push(noPrefix);
   
-  for (const j of STATE.journals) {
-    const name = (j[0] || '').toLowerCase();
-    const issn = (j[1] || '').replace(/-/g, '');
-    
-    // Match by any query variant
+  for (let i = 0; i < len; i++) {
+    const name = names[i];
     let matched = false;
-    for (const qv of queries) {
-      if (name.includes(qv)) { matched = true; break; }
+    for (let qi = 0; qi < qs.length; qi++) {
+      if (name.indexOf(qs[qi]) !== -1) { matched = true; break; }
     }
-    if (!matched && byIssn && issn.includes(byIssn)) matched = true;
-    
-    // Word-by-word fallback (less strict): all significant words must appear
-    if (!matched && queries[0].split(/\s+/).filter(w => w.length > 2).every(w => name.includes(w))) {
-      matched = true;
+    if (!matched && byIssn) {
+      const issn = (journals[i][1] || '').replace(/-/g, '');
+      if (issn.indexOf(byIssn) !== -1) matched = true;
+    }
+    // Word-by-word fallback
+    if (!matched) {
+      const words = qs[0].split(/\s+/).filter(w => w.length > 2);
+      if (words.length && words.every(w => name.indexOf(w) !== -1)) matched = true;
     }
     
     if (matched) {
-      results.push(j);
+      results.push({idx: i, j: journals[i]});
       if (results.length >= 20) break;
     }
   }
   
-  // Sort: exact name match first, then prefix, then contains, then IF
+  // Sort by match quality
   results.sort((a, b) => {
-    const aName = (a[0] || '').toLowerCase();
-    const bName = (b[0] || '').toLowerCase();
+    const aName = names[a.idx];
+    const bName = names[b.idx];
     const aExact = aName === q ? 0 : aName.startsWith(q) ? 1 : 2;
     const bExact = bName === q ? 0 : bName.startsWith(q) ? 1 : 2;
     if (aExact !== bExact) return aExact - bExact;
-    return (b[2] || 0) - (a[2] || 0);
+    return (b.j[2] || 0) - (a.j[2] || 0);
   });
   
-  return results;
+  return results.map(r => r.j);
 }
 
-// Exact match lookup (case-insensitive) — used for DOI/PDF flows
+// Exact match — uses precomputed index
 function searchJournalsExact(name) {
   if (!name) return null;
   const q = name.toLowerCase().trim();
-  return STATE.journals.find(j => (j[0] || '').toLowerCase() === q) || null;
+  const idx = STATE.namesLower.indexOf(q);
+  return idx !== -1 ? STATE.journals[idx] : null;
 }
 
 function showSuggestions(results) {
