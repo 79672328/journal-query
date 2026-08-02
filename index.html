@@ -394,22 +394,22 @@ function renderCard(m, extraClass = '') {
   let h = `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
     <div class="result-title">${esc(name)}</div>
     <div class="result-issn">${issn ? 'ISSN ' + issn : ''}</div>
-    <div class="result-grid">
-    <div class="result-item">
-      <div class="label">影响因子</div>
-      <div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div>
-    </div>`;
+    <div class="result-grid">`;
   if (xrCat || xrQ) {
-    h += `<div class="result-item">
-      <div class="label">新锐大类</div>
-      <div class="value" style="font-size:15px;color:var(--text)">${xrCat || '-'}</div>
+    h += `<div class="result-item full">
+      <div class="label">新锐分区</div>
+      <div class="value">${xrQ ? '<span class="badge ' + xrColorClass + '" style="font-size:18px;padding:6px 20px">' + xrQ + '</span>' : '-'}</div>
     </div>
     <div class="result-item">
-      <div class="label">新锐分区</div>
-      <div class="value" style="color:var(--text)">${xrQ ? '<span class="badge ' + xrColorClass + '" style="font-size:14px;padding:4px 12px">' + xrQ + '</span>' : '-'}</div>
+      <div class="label">新锐大类</div>
+      <div class="value" style="font-size:16px;color:var(--text)">${xrCat || '-'}</div>
     </div>`;
   }
-  h += `</div></div>`;
+  h += `<div class="result-item">
+      <div class="label">影响因子</div>
+      <div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div>
+    </div>
+  </div></div>`;
   return h;
 }
 
@@ -430,17 +430,17 @@ function showResults(matches, source = '', unknownJournal = null) {
     if (title) html += `<div style="font-size:12px;color:var(--sub);margin-bottom:12px;line-height:1.4">${title}</div>`;
     
     html += `<div class="result-grid">
-      <div class="result-item">
-        <div class="label">影响因子</div>
-        <div class="value" style="font-size:14px;color:var(--sub)">-</div>
+      <div class="result-item full">
+        <div class="label">新锐分区</div>
+        <div class="value" style="font-size:14px;color:#e67e22">暂未收录</div>
       </div>
       <div class="result-item">
         <div class="label">新锐大类</div>
-        <div class="value" style="font-size:12px;color:var(--sub)">暂未收录</div>
-      </div>
-      <div class="result-item full">
-        <div class="label">新锐分区</div>
         <div class="value" style="font-size:12px;color:var(--sub)">-</div>
+      </div>
+      <div class="result-item">
+        <div class="label">影响因子</div>
+        <div class="value" style="font-size:14px;color:var(--sub)">-</div>
       </div>
     </div>
     <div style="margin-top:12px;padding:8px 10px;background:#fef9f0;border-radius:8px;font-size:12px;color:#b87333;line-height:1.5">
