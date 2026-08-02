@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>期刊分区查询</title>
+<title>新锐期刊分区查询</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -103,8 +103,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
   <div class="header">
     <div class="header-icon">JQ</div>
     <div>
-      <h1>期刊分区查询</h1>
-      <div class="sub">JCR &middot; 新锐 &middot; 2026</div>
+      <h1>新锐期刊分区查询</h1>
+      <div class="sub">影响因子 &middot; 新锐分区 &middot; 2026</div>
     </div>
   </div>
 
@@ -238,7 +238,7 @@ function searchJournals(query) {
     const aExact = aName === q ? 0 : aName.startsWith(q) ? 1 : 2;
     const bExact = bName === q ? 0 : bName.startsWith(q) ? 1 : 2;
     if (aExact !== bExact) return aExact - bExact;
-    return (b[3] || 0) - (a[3] || 0);
+    return (b[2] || 0) - (a[2] || 0);
   });
   
   return results;
@@ -256,13 +256,12 @@ function showSuggestions(results) {
   if (!results.length) { el.classList.remove('show'); return; }
   
   el.innerHTML = results.map((j, i) => {
-    let jcrBadge = '', xrBadge = '';
-    if (j[2]) jcrBadge = `<span class="badge badge-${j[2].toLowerCase()}">JCR ${j[2]}</span>`;
-    if (j[5]) xrBadge = `<span class="badge badge-q${j[5].charAt(0)}">新锐 ${j[5]}</span>`;
-    const ifText = j[3] ? `IF ${j[3]}` : '';
+    let xrBadge = '';
+    if (j[4]) xrBadge = `<span class="badge badge-q${j[4].charAt(0)}">新锐 ${j[4]}</span>`;
+    const ifText = j[2] ? `IF ${j[2]}` : '';
     return `<div class="sug-item" data-idx="${i}">
       <div class="sug-name">${esc(j[0])}</div>
-      <div class="sug-meta">${jcrBadge}${xrBadge}<span style="color:#888">${ifText}</span></div>
+      <div class="sug-meta">${xrBadge}<span style="color:#888">${ifText}</span></div>
     </div>`;
   }).join('');
   
@@ -370,10 +369,6 @@ function showResults(matches, source = '', unknownJournal = null) {
     
     html += `<div class="result-grid">
       <div class="result-item">
-        <div class="label">JCR分区</div>
-        <div class="value" style="font-size:14px;color:#e67e22">暂未收录</div>
-      </div>
-      <div class="result-item">
         <div class="label">影响因子</div>
         <div class="value" style="font-size:14px;color:var(--sub)">-</div>
       </div>
@@ -381,13 +376,13 @@ function showResults(matches, source = '', unknownJournal = null) {
         <div class="label">新锐大类</div>
         <div class="value" style="font-size:12px;color:var(--sub)">暂未收录</div>
       </div>
-      <div class="result-item">
+      <div class="result-item full">
         <div class="label">新锐分区</div>
         <div class="value" style="font-size:12px;color:var(--sub)">-</div>
       </div>
     </div>
     <div style="margin-top:12px;padding:8px 10px;background:#fef9f0;border-radius:8px;font-size:12px;color:#b87333;line-height:1.5">
-      该期刊暂未被JCR或新锐分区数据库收录。可能是新创期刊或尚未被索引。
+      该期刊暂未被新锐分区数据库收录。可能是新创期刊或尚未被索引。
     </div></div>`;
     
     if (source) {
@@ -417,26 +412,18 @@ function showResults(matches, source = '', unknownJournal = null) {
   const visible = showAll ? matches : matches.slice(0, MAX_VISIBLE);
   
   visible.forEach(m => {
-    const [name, issn, jcrQ, jif, xrCat, xrQ] = m;
+    const [name, issn, jif, xrCat, xrQ] = m;
     
-    const jcrColor = jcrQ ? `qt-${jcrQ.toLowerCase()}` : '';
     const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
     
     let html = `<div class="result-card">
       <div class="result-title">${esc(name)}</div>
       <div class="result-issn">${issn ? 'ISSN ' + issn : ''}</div>
-      <div class="result-grid">`;
-    
-    if (jcrQ || jif) {
-      html += `<div class="result-item">
-        <div class="label">JCR分区</div>
-        <div class="value ${jcrColor}">${jcrQ || '-'}</div>
-      </div>
+      <div class="result-grid">
       <div class="result-item">
         <div class="label">影响因子</div>
         <div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div>
       </div>`;
-    }
     
     if (xrCat || xrQ) {
       html += `<div class="result-item">
@@ -445,7 +432,7 @@ function showResults(matches, source = '', unknownJournal = null) {
       </div>
       <div class="result-item">
         <div class="label">新锐分区</div>
-        <div class="value ${xrColorClass ? '' : ''}" style="color:var(--text)">${xrQ ? '<span class="badge ' + xrColorClass + '" style="font-size:14px;padding:4px 12px">' + xrQ + '</span>' : '-'}</div>
+        <div class="value" style="color:var(--text)">${xrQ ? '<span class="badge ' + xrColorClass + '" style="font-size:14px;padding:4px 12px">' + xrQ + '</span>' : '-'}</div>
       </div>`;
     }
     
@@ -463,17 +450,13 @@ function showResults(matches, source = '', unknownJournal = null) {
     // Fold hidden results
     for (let i = MAX_VISIBLE; i < matches.length; i++) {
       const m = matches[i];
-      const [name, issn, jcrQ, jif, xrCat, xrQ] = m;
-      const jcrColor = jcrQ ? `qt-${jcrQ.toLowerCase()}` : '';
+      const [name, issn, jif, xrCat, xrQ] = m;
       const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
       let html = `<div class="result-card result-folded" style="display:none">
         <div class="result-title">${esc(name)}</div>
         <div class="result-issn">${issn ? 'ISSN ' + issn : ''}</div>
-        <div class="result-grid">`;
-      if (jcrQ || jif) {
-        html += `<div class="result-item"><div class="label">JCR分区</div><div class="value ${jcrColor}">${jcrQ || '-'}</div></div>`;
-        html += `<div class="result-item"><div class="label">影响因子</div><div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div></div>`;
-      }
+        <div class="result-grid">
+        <div class="result-item"><div class="label">影响因子</div><div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div></div>`;
       if (xrCat || xrQ) {
         html += `<div class="result-item"><div class="label">新锐大类</div><div class="value" style="font-size:15px;color:var(--text)">${xrCat || '-'}</div></div>`;
         html += `<div class="result-item"><div class="label">新锐分区</div><div class="value" style="color:var(--text)">${xrQ ? '<span class="badge ' + xrColorClass + '">' + xrQ + '</span>' : '-'}</div></div>`;
