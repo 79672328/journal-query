@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="description" content="新锐期刊分区查询工具，支持期刊名搜索、DOI查询、PDF上传三种方式，快速获取影响因子和新锐分区。">
 <meta name="theme-color" content="#1a73e8">
+<link rel="preconnect" href="https://api.crossref.org">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="期刊分区">
@@ -38,8 +41,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .input-card{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:12px}
 .input-row{display:flex;gap:8px}
 .input-row input{flex:1;height:44px;border:1.5px solid var(--border);border-radius:10px;padding:0 14px;font-size:15px;font-family:inherit;outline:none;transition:border .2s;-webkit-appearance:none}
-.input-row input:focus{border-color:var(--blue)}
+.input-row input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,115,232,.15)}
+.input-row input:focus-visible{outline:none}
 .input-row button{height:44px;padding:0 20px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .2s;-webkit-appearance:none}
+.input-row button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .input-row button:active{background:var(--blue-h)}
 .input-row button:disabled{opacity:.5}
 
@@ -55,7 +60,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .suggestions.show{display:block}
 .sug-item{padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
 .sug-item:last-child{border-bottom:none}
-.sug-item:active,.sug-item:hover{background:#f5f8ff}
+.sug-item:active,.sug-item:hover,.sug-item.sug-active{background:#f5f8ff}
 .sug-name{font-size:14px;font-weight:500;margin-bottom:3px;line-height:1.3}
 .sug-meta{display:flex;gap:8px;font-size:12px}
 .sug-meta span{padding:2px 6px;border-radius:4px;font-weight:500}
@@ -138,7 +143,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     <div id="modePdf" class="hidden">
       <div class="upload-area" id="uploadArea">
         <div class="icon">📄</div>
-        <div class="text">点击或拖拽上传PDF</div>
+        <div class="text" id="uploadText">点击或拖拽上传PDF</div>
         <div class="hint">自动提取期刊信息，支持20MB以内PDF</div>
       </div>
       <input type="file" id="pdfInput" accept=".pdf" class="hidden">
@@ -167,8 +172,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
+// ==================== Lazy Load pdf.js ====================
+let pdfJsLoading = false, pdfJsLoaded = false;
+function loadPdfJs() {
+  return new Promise((resolve) => {
+    if (pdfJsLoaded) { resolve(); return; }
+    if (pdfJsLoading) {
+      const check = setInterval(() => { if (pdfJsLoaded) { clearInterval(check); resolve(); } }, 100);
+      return;
+    }
+    pdfJsLoading = true;
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = () => { pdfJsLoaded = true; resolve(); };
+    s.onerror = () => { pdfJsLoading = false; resolve(); };
+    document.head.appendChild(s);
+  });
+}
+
 // ==================== App State ====================
 const STATE = {
   journals: [],
@@ -180,20 +202,34 @@ const STATE = {
 // ==================== Data Loading ====================
 async function loadData() {
   try {
+    $('stats').textContent = '正在加载数据库...';
     const resp = await fetch('journal_data.json.gz');
     if (!resp.ok) throw new Error('Data fetch failed');
+    // Read with progress
+    const reader = resp.body.getReader();
+    const chunks = [];
+    let received = 0;
+    const total = parseInt(resp.headers.get('Content-Length') || '450000');
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      const pct = Math.round(received / total * 100);
+      $('stats').textContent = `加载数据库... ${pct}%`;
+    }
+    const blob = new Blob(chunks);
     const ds = new DecompressionStream('gzip');
-    const stream = resp.body.pipeThrough(ds);
+    const stream = blob.stream().pipeThrough(ds);
     const text = await new Response(stream).text();
     const data = JSON.parse(text);
     STATE.journals = data.journals;
     STATE.loaded = true;
     $('stats').textContent = `已加载 ${data.total.toLocaleString()} 条期刊数据 · ${data.updated}`;
-    console.log(`Loaded ${data.total} journals`);
   } catch(e) {
     console.error('Data load error:', e);
     $('stats').textContent = '数据加载失败，请刷新重试';
-    setTimeout(() => loadData(), 3000);
+    setTimeout(() => loadData(), 5000);
   }
 }
 
@@ -274,9 +310,13 @@ async function lookupDoi(doi) {
   if (!clean) return null;
   
   try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
     const resp = await fetch(`https://api.crossref.org/works/${encodeURIComponent(clean)}`, {
-      headers: { 'Accept': 'application/json' }
+      headers: { 'Accept': 'application/json' },
+      signal: ctrl.signal
     });
+    clearTimeout(timer);
     if (!resp.ok) return null;
     const data = await resp.json();
     const msg = data.message;
@@ -351,6 +391,31 @@ async function parsePdf(file) {
 }
 
 // ==================== Render ====================
+function renderCard(m, extraClass = '') {
+  const [name, issn, jif, xrCat, xrQ] = m;
+  const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
+  let h = `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
+    <div class="result-title">${esc(name)}</div>
+    <div class="result-issn">${issn ? 'ISSN ' + issn : ''}</div>
+    <div class="result-grid">
+    <div class="result-item">
+      <div class="label">影响因子</div>
+      <div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div>
+    </div>`;
+  if (xrCat || xrQ) {
+    h += `<div class="result-item">
+      <div class="label">新锐大类</div>
+      <div class="value" style="font-size:15px;color:var(--text)">${xrCat || '-'}</div>
+    </div>
+    <div class="result-item">
+      <div class="label">新锐分区</div>
+      <div class="value" style="color:var(--text)">${xrQ ? '<span class="badge ' + xrColorClass + '" style="font-size:14px;padding:4px 12px">' + xrQ + '</span>' : '-'}</div>
+    </div>`;
+  }
+  h += `</div></div>`;
+  return h;
+}
+
 function showResults(matches, source = '', unknownJournal = null) {
   const el = $('results');
   el.innerHTML = '';
@@ -412,57 +477,18 @@ function showResults(matches, source = '', unknownJournal = null) {
   const visible = showAll ? matches : matches.slice(0, MAX_VISIBLE);
   
   visible.forEach(m => {
-    const [name, issn, jif, xrCat, xrQ] = m;
-    
-    const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
-    
-    let html = `<div class="result-card">
-      <div class="result-title">${esc(name)}</div>
-      <div class="result-issn">${issn ? 'ISSN ' + issn : ''}</div>
-      <div class="result-grid">
-      <div class="result-item">
-        <div class="label">影响因子</div>
-        <div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div>
-      </div>`;
-    
-    if (xrCat || xrQ) {
-      html += `<div class="result-item">
-        <div class="label">新锐大类</div>
-        <div class="value" style="font-size:15px;color:var(--text)">${xrCat || '-'}</div>
-      </div>
-      <div class="result-item">
-        <div class="label">新锐分区</div>
-        <div class="value" style="color:var(--text)">${xrQ ? '<span class="badge ' + xrColorClass + '" style="font-size:14px;padding:4px 12px">' + xrQ + '</span>' : '-'}</div>
-      </div>`;
-    }
-    
-    html += `</div></div>`;
-    el.innerHTML += html;
+    el.innerHTML += renderCard(m);
   });
   
   // Show "expand" button if there are more results
   if (!showAll) {
     el.innerHTML += `<div style="text-align:center;padding:8px">
-      <button onclick="this.remove();document.querySelectorAll('.result-folded').forEach(el=>el.classList.remove('result-folded'))" 
+      <button onclick="this.remove();document.querySelectorAll('.result-folded').forEach(el=>{el.style.display='';el.style.animation='fadeIn .3s ease'})" 
         style="background:none;border:1px solid var(--blue);color:var(--blue);padding:8px 24px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit">
         显示全部 ${matches.length} 条结果
       </button></div>`;
-    // Fold hidden results
     for (let i = MAX_VISIBLE; i < matches.length; i++) {
-      const m = matches[i];
-      const [name, issn, jif, xrCat, xrQ] = m;
-      const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
-      let html = `<div class="result-card result-folded" style="display:none">
-        <div class="result-title">${esc(name)}</div>
-        <div class="result-issn">${issn ? 'ISSN ' + issn : ''}</div>
-        <div class="result-grid">
-        <div class="result-item"><div class="label">影响因子</div><div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div></div>`;
-      if (xrCat || xrQ) {
-        html += `<div class="result-item"><div class="label">新锐大类</div><div class="value" style="font-size:15px;color:var(--text)">${xrCat || '-'}</div></div>`;
-        html += `<div class="result-item"><div class="label">新锐分区</div><div class="value" style="color:var(--text)">${xrQ ? '<span class="badge ' + xrColorClass + '">' + xrQ + '</span>' : '-'}</div></div>`;
-      }
-      html += `</div></div>`;
-      el.innerHTML += html;
+      el.innerHTML += renderCard(matches[i], 'result-folded');
     }
   }
 }
@@ -484,18 +510,48 @@ $$('.mode-btn').forEach(btn => {
 
 // Name search - live suggestions
 let suggResults = [];
+let suggIndex = -1;
 $('nameInput').addEventListener('input', debounce(function() {
   const q = this.value;
   if (q.length < 2) {
     $('suggestions').classList.remove('show');
+    suggIndex = -1;
     return;
   }
   suggResults = searchJournals(q);
+  suggIndex = -1;
   showSuggestions(suggResults);
 }, 200));
 
 $('nameInput').addEventListener('keydown', function(e) {
+  const sugEl = $('suggestions');
+  const items = sugEl.querySelectorAll('.sug-item');
+  
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (sugEl.classList.contains('show') && items.length) {
+      suggIndex = Math.min(suggIndex + 1, items.length - 1);
+      items.forEach((el, i) => el.classList.toggle('sug-active', i === suggIndex));
+      items[suggIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+    return;
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (sugEl.classList.contains('show') && items.length) {
+      suggIndex = Math.max(suggIndex - 1, 0);
+      items.forEach((el, i) => el.classList.toggle('sug-active', i === suggIndex));
+      items[suggIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+    return;
+  }
   if (e.key === 'Enter') {
+    if (sugEl.classList.contains('show') && suggIndex >= 0 && suggResults[suggIndex]) {
+      e.preventDefault();
+      showResults([suggResults[suggIndex]]);
+      sugEl.classList.remove('show');
+      return;
+    }
     const q = this.value.trim();
     if (q.length >= 2) {
       suggResults = searchJournals(q);
@@ -592,14 +648,29 @@ $('uploadArea').addEventListener('drop', e => {
 
 async function handlePdfFile(e) {
   const file = e.target.files[0];
-  if (file) await processPdf(file);
+  if (file) {
+    $('uploadText').textContent = `已选择: ${file.name}`;
+    $('uploadText').style.color = 'var(--blue)';
+    await processPdf(file);
+  }
 }
 
 async function processPdf(file) {
   if (file.size > 20 * 1024 * 1024) {
     showToast('PDF文件不能超过20MB');
+    $('uploadText').textContent = '点击或拖拽上传PDF';
+    $('uploadText').style.color = '';
     return;
   }
+  
+  showLoading('加载PDF解析引擎...');
+  await loadPdfJs();
+  if (!pdfJsLoaded) {
+    showToast('PDF解析库加载失败，请用期刊名或DOI查询');
+    hideLoading();
+    return;
+  }
+  hideLoading();
   
   showLoading('解析PDF中...');
   const info = await parsePdf(file);
@@ -616,7 +687,9 @@ async function processPdf(file) {
   // Try DOI first
   if (info.doi) {
     source = `DOI: ${esc(info.doi)} `;
+    showLoading('通过DOI查询期刊信息...');
     const crossrefInfo = await lookupDoi(info.doi);
+    hideLoading();
     if (crossrefInfo && crossrefInfo.journal) {
       source += `→ ${esc(crossrefInfo.journal)}`;
       // Exact match first
@@ -630,6 +703,8 @@ async function processPdf(file) {
       if (!matches.length) {
         showResults([], source, crossrefInfo);
         $('pdfInput').value = '';
+        $('uploadText').textContent = '点击或拖拽上传PDF';
+        $('uploadText').style.color = '';
         return;
       }
     }
@@ -642,6 +717,8 @@ async function processPdf(file) {
     if (!matches.length) {
       showResults([], source, { journal: info.journal, title: info.title, doi: info.doi });
       $('pdfInput').value = '';
+      $('uploadText').textContent = '点击或拖拽上传PDF';
+      $('uploadText').style.color = '';
       return;
     }
   }
@@ -654,6 +731,8 @@ async function processPdf(file) {
   if (!matches.length) {
     showResults([], source, info);
     $('pdfInput').value = '';
+    $('uploadText').textContent = '点击或拖拽上传PDF';
+    $('uploadText').style.color = '';
     return;
   }
   
@@ -661,6 +740,8 @@ async function processPdf(file) {
   
   showResults(matches, source);
   $('pdfInput').value = '';
+  $('uploadText').textContent = '点击或拖拽上传PDF';
+  $('uploadText').style.color = '';
 }
 
 // ==================== UI Helpers ====================
