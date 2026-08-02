@@ -230,18 +230,24 @@ function searchJournals(query) {
     }
   }
   
-  // Sort: exact starts-with first, then contains, then word-match
+  // Sort: exact name match first, then prefix, then contains, then IF
   results.sort((a, b) => {
     const aName = (a[0] || '').toLowerCase();
     const bName = (b[0] || '').toLowerCase();
-    const aExact = aName.startsWith(q) ? 0 : 1;
-    const bExact = bName.startsWith(q) ? 0 : 1;
+    const aExact = aName === q ? 0 : aName.startsWith(q) ? 1 : 2;
+    const bExact = bName === q ? 0 : bName.startsWith(q) ? 1 : 2;
     if (aExact !== bExact) return aExact - bExact;
-    // Then by IF desc
     return (b[3] || 0) - (a[3] || 0);
   });
   
   return results;
+}
+
+// Exact match lookup (case-insensitive) — used for DOI/PDF flows
+function searchJournalsExact(name) {
+  if (!name) return null;
+  const q = name.toLowerCase().trim();
+  return STATE.journals.find(j => (j[0] || '').toLowerCase() === q) || null;
 }
 
 function showSuggestions(results) {
@@ -405,7 +411,11 @@ function showResults(matches, source = '', unknownJournal = null) {
     el.innerHTML += `<div style="font-size:12px;color:var(--sub);margin-bottom:8px">${source}</div>`;
   }
   
-  matches.forEach(m => {
+  const MAX_VISIBLE = 5;
+  const showAll = matches.length <= MAX_VISIBLE;
+  const visible = showAll ? matches : matches.slice(0, MAX_VISIBLE);
+  
+  visible.forEach(m => {
     const [name, issn, jcrQ, jif, xrCat, xrQ] = m;
     
     const jcrColor = jcrQ ? `qt-${jcrQ.toLowerCase()}` : '';
@@ -441,6 +451,36 @@ function showResults(matches, source = '', unknownJournal = null) {
     html += `</div></div>`;
     el.innerHTML += html;
   });
+  
+  // Show "expand" button if there are more results
+  if (!showAll) {
+    el.innerHTML += `<div style="text-align:center;padding:8px">
+      <button onclick="this.remove();document.querySelectorAll('.result-folded').forEach(el=>el.classList.remove('result-folded'))" 
+        style="background:none;border:1px solid var(--blue);color:var(--blue);padding:8px 24px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit">
+        显示全部 ${matches.length} 条结果
+      </button></div>`;
+    // Fold hidden results
+    for (let i = MAX_VISIBLE; i < matches.length; i++) {
+      const m = matches[i];
+      const [name, issn, jcrQ, jif, xrCat, xrQ] = m;
+      const jcrColor = jcrQ ? `qt-${jcrQ.toLowerCase()}` : '';
+      const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
+      let html = `<div class="result-card result-folded" style="display:none">
+        <div class="result-title">${esc(name)}</div>
+        <div class="result-issn">${issn ? 'ISSN ' + issn : ''}</div>
+        <div class="result-grid">`;
+      if (jcrQ || jif) {
+        html += `<div class="result-item"><div class="label">JCR分区</div><div class="value ${jcrColor}">${jcrQ || '-'}</div></div>`;
+        html += `<div class="result-item"><div class="label">影响因子</div><div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div></div>`;
+      }
+      if (xrCat || xrQ) {
+        html += `<div class="result-item"><div class="label">新锐大类</div><div class="value" style="font-size:15px;color:var(--text)">${xrCat || '-'}</div></div>`;
+        html += `<div class="result-item"><div class="label">新锐分区</div><div class="value" style="color:var(--text)">${xrQ ? '<span class="badge ' + xrColorClass + '">' + xrQ + '</span>' : '-'}</div></div>`;
+      }
+      html += `</div></div>`;
+      el.innerHTML += html;
+    }
+  }
 }
 
 // ==================== Event Handlers ====================
@@ -529,16 +569,18 @@ async function doDoiSearch(doi) {
     return;
   }
   
-  // Search local database
+  // Search local database: exact match first
   let matches = [];
-  if (info.journal) matches = searchJournals(info.journal);
-  if (!matches.length && info.issn) {
-    matches = searchJournals(info.issn);
+  if (info.journal) {
+    const exact = searchJournalsExact(info.journal);
+    if (exact) { matches = [exact]; }
   }
+  // Fallback to broad search
+  if (!matches.length && info.journal) matches = searchJournals(info.journal);
+  if (!matches.length && info.issn) matches = searchJournals(info.issn);
   
   const source = info.title ? `📄 ${esc(info.title)}<br>DOI: ${esc(doi)}` : `DOI: ${esc(doi)}`;
   if (!matches.length) {
-    // Show partial result when journal is identified but not in database
     showResults([], source, { journal: info.journal, title: info.title, doi: info.doi });
   } else {
     showResults(matches, source);
@@ -593,11 +635,14 @@ async function processPdf(file) {
     const crossrefInfo = await lookupDoi(info.doi);
     if (crossrefInfo && crossrefInfo.journal) {
       source += `→ ${esc(crossrefInfo.journal)}`;
-      matches = searchJournals(crossrefInfo.journal);
+      // Exact match first
+      const exact = searchJournalsExact(crossrefInfo.journal);
+      if (exact) { matches = [exact]; }
+      // Fallback: broad search
+      if (!matches.length) matches = searchJournals(crossrefInfo.journal);
       if (!matches.length && crossrefInfo.issn) {
         matches = searchJournals(crossrefInfo.issn);
       }
-      // If still no match, prepare to show partial result
       if (!matches.length) {
         showResults([], source, crossrefInfo);
         $('pdfInput').value = '';
