@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#1a73e8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="期刊分区">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>期刊分区查询</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --c1:#e74c3c;--c2:#e67e22;--c3:#2980b9;--c4:#7f8c8d;
+  --bg:#f0f2f5;--card:#fff;--text:#1a1a2e;--sub:#666;--border:#e0e0e0;
+  --blue:#1a73e8;--blue-h:#1557b0;--green:#27ae60;
+  --radius:12px;--shadow:0 2px 12px rgba(0,0,0,.08);
+  --safe-bottom:env(safe-area-inset-bottom,16px);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:var(--safe-bottom);-webkit-tap-highlight-color:transparent}
+.app{max-width:500px;margin:0 auto;padding:0 16px}
+
+/* Header */
+.header{padding:20px 0 12px;display:flex;align-items:center;gap:12px}
+.header-icon{width:36px;height:36px;background:var(--blue);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0}
+.header h1{font-size:20px;font-weight:600}
+.header .sub{font-size:12px;color:var(--sub)}
+
+/* Mode tabs */
+.modes{display:flex;gap:4px;margin-bottom:12px;background:var(--card);border-radius:var(--radius);padding:4px;box-shadow:var(--shadow)}
+.mode-btn{flex:1;padding:10px 0;text-align:center;border:none;background:none;font-size:14px;color:var(--sub);border-radius:10px;cursor:pointer;transition:all .2s;font-family:inherit}
+.mode-btn.active{background:var(--blue);color:#fff;font-weight:500}
+
+/* Input area */
+.input-card{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:12px}
+.input-row{display:flex;gap:8px}
+.input-row input{flex:1;height:44px;border:1.5px solid var(--border);border-radius:10px;padding:0 14px;font-size:15px;font-family:inherit;outline:none;transition:border .2s;-webkit-appearance:none}
+.input-row input:focus{border-color:var(--blue)}
+.input-row button{height:44px;padding:0 20px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .2s;-webkit-appearance:none}
+.input-row button:active{background:var(--blue-h)}
+.input-row button:disabled{opacity:.5}
+
+/* PDF upload */
+.upload-area{border:2px dashed var(--border);border-radius:var(--radius);padding:24px;text-align:center;cursor:pointer;transition:border .2s;margin-top:8px}
+.upload-area:hover,.upload-area.drag{border-color:var(--blue);background:#f0f6ff}
+.upload-area .icon{font-size:32px;margin-bottom:6px}
+.upload-area .text{font-size:14px;color:var(--sub)}
+.upload-area .hint{font-size:12px;color:#999;margin-top:4px}
+
+/* Suggestions dropdown */
+.suggestions{background:var(--card);border-radius:0 0 var(--radius) var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:320px;overflow-y:auto;position:absolute;left:16px;right:16px;z-index:10;display:none}
+.suggestions.show{display:block}
+.sug-item{padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.sug-item:last-child{border-bottom:none}
+.sug-item:active,.sug-item:hover{background:#f5f8ff}
+.sug-name{font-size:14px;font-weight:500;margin-bottom:3px;line-height:1.3}
+.sug-meta{display:flex;gap:8px;font-size:12px}
+.sug-meta span{padding:2px 6px;border-radius:4px;font-weight:500}
+
+/* Result card */
+.result-card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:12px;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.result-title{font-size:16px;font-weight:600;line-height:1.4;margin-bottom:4px;color:var(--text)}
+.result-issn{font-size:13px;color:var(--sub);margin-bottom:14px}
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.result-item{background:#f8f9fb;border-radius:10px;padding:12px;text-align:center}
+.result-item.full{grid-column:1/-1}
+.result-item .label{font-size:11px;color:var(--sub);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.result-item .value{font-size:20px;font-weight:700}
+.result-item .extra{font-size:12px;color:var(--sub);margin-top:2px}
+
+.qt-q1{color:var(--c1)}.qt-q2{color:var(--c2)}.qt-q3{color:var(--c3)}.qt-q4{color:var(--c4)}
+.badge{display:inline-block;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge-q1{background:#fde8e8;color:var(--c1)}.badge-q2{background:#fef3e3;color:var(--c2)}
+.badge-q3{background:#e8f0fe;color:var(--c3)}.badge-q4{background:#f0f0f0;color:var(--c4)}
+
+/* States */
+.state{padding:40px 20px;text-align:center}
+.state .icon{font-size:40px;margin-bottom:8px}
+.state .msg{font-size:14px;color:var(--sub);line-height:1.6}
+.spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Stats */
+.stats{text-align:center;padding:12px;font-size:11px;color:#aaa}
+.hidden{display:none!important}
+
+/* Toast */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+
+@media (max-width:360px){
+  .result-grid{grid-template-columns:1fr;gap:8px}
+  .result-item .value{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="header-icon">JQ</div>
+    <div>
+      <h1>期刊分区查询</h1>
+      <div class="sub">JCR &middot; 新锐 &middot; 2026</div>
+    </div>
+  </div>
+
+  <!-- Mode tabs -->
+  <div class="modes">
+    <button class="mode-btn active" data-mode="name">期刊名</button>
+    <button class="mode-btn" data-mode="doi">DOI</button>
+    <button class="mode-btn" data-mode="pdf">PDF上传</button>
+  </div>
+
+  <!-- Input card -->
+  <div class="input-card" id="inputCard">
+    <!-- Name search -->
+    <div id="modeName">
+      <div class="input-row" style="position:relative">
+        <input type="text" id="nameInput" placeholder="输入期刊名称或ISSN..." autocomplete="off">
+        <button id="nameClearBtn" class="hidden" style="background:#999;padding:0 14px">✕</button>
+      </div>
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+
+    <!-- DOI search -->
+    <div id="modeDoi" class="hidden">
+      <div class="input-row">
+        <input type="text" id="doiInput" placeholder="输入DOI，如 10.1000/xyz123">
+        <button id="doiBtn">查询</button>
+      </div>
+    </div>
+
+    <!-- PDF upload -->
+    <div id="modePdf" class="hidden">
+      <div class="upload-area" id="uploadArea">
+        <div class="icon">📄</div>
+        <div class="text">点击或拖拽上传PDF</div>
+        <div class="hint">自动提取期刊信息，支持20MB以内PDF</div>
+      </div>
+      <input type="file" id="pdfInput" accept=".pdf" class="hidden">
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading" class="state hidden">
+    <div class="spinner"></div>
+    <div class="msg" style="margin-top:12px" id="loadingMsg">查询中...</div>
+  </div>
+
+  <!-- Results -->
+  <div id="results"></div>
+
+  <!-- Empty state -->
+  <div id="emptyState" class="state">
+    <div class="icon">🔍</div>
+    <div class="msg">输入期刊名、DOI 或上传 PDF<br>即刻查分区和影响因子</div>
+  </div>
+
+  <!-- Data status -->
+  <div class="stats" id="stats"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// ==================== App State ====================
+const STATE = {
+  journals: [],
+  loaded: false,
+  mode: 'name',
+  searching: false
+};
+
+// ==================== Data Loading ====================
+async function loadData() {
+  try {
+    const resp = await fetch('journal_data.json.gz');
+    if (!resp.ok) throw new Error('Data fetch failed');
+    const ds = new DecompressionStream('gzip');
+    const stream = resp.body.pipeThrough(ds);
+    const text = await new Response(stream).text();
+    const data = JSON.parse(text);
+    STATE.journals = data.journals;
+    STATE.loaded = true;
+    $('stats').textContent = `已加载 ${data.total.toLocaleString()} 条期刊数据 · ${data.updated}`;
+    console.log(`Loaded ${data.total} journals`);
+  } catch(e) {
+    console.error('Data load error:', e);
+    $('stats').textContent = '数据加载失败，请刷新重试';
+    setTimeout(() => loadData(), 3000);
+  }
+}
+
+// ==================== Search ====================
+function searchJournals(query) {
+  if (!query || query.length < 2) return [];
+  const q = query.toLowerCase().trim();
+  const results = [];
+  const byIssn = q.replace(/[^0-9]/g, '');
+  
+  for (const j of STATE.journals) {
+    const name = (j[0] || '').toLowerCase();
+    const issn = (j[1] || '').replace(/-/g, '');
+    
+    // Match by name (substring) or ISSN
+    if (name.includes(q) || (byIssn && issn.includes(byIssn))) {
+      results.push(j);
+      if (results.length >= 20) break;
+    }
+  }
+  
+  // Sort: exact starts-with first, then contains
+  results.sort((a, b) => {
+    const aName = (a[0] || '').toLowerCase();
+    const bName = (b[0] || '').toLowerCase();
+    const aStarts = aName.startsWith(q) ? 0 : 1;
+    const bStarts = bName.startsWith(q) ? 0 : 1;
+    if (aStarts !== bStarts) return aStarts - bStarts;
+    // Then by IF desc
+    return (b[3] || 0) - (a[3] || 0);
+  });
+  
+  return results;
+}
+
+function showSuggestions(results) {
+  const el = $('suggestions');
+  if (!results.length) { el.classList.remove('show'); return; }
+  
+  el.innerHTML = results.map((j, i) => {
+    let jcrBadge = '', xrBadge = '';
+    if (j[2]) jcrBadge = `<span class="badge badge-${j[2].toLowerCase()}">JCR ${j[2]}</span>`;
+    if (j[5]) xrBadge = `<span class="badge badge-q${j[5].charAt(0)}">新锐 ${j[5]}</span>`;
+    const ifText = j[3] ? `IF ${j[3]}` : '';
+    return `<div class="sug-item" data-idx="${i}">
+      <div class="sug-name">${esc(j[0])}</div>
+      <div class="sug-meta">${jcrBadge}${xrBadge}<span style="color:#888">${ifText}</span></div>
+    </div>`;
+  }).join('');
+  
+  el.classList.add('show');
+}
+
+// ==================== DOI Lookup ====================
+async function lookupDoi(doi) {
+  const clean = doi.trim().replace(/^https?:\/\/doi\.org\//i, '');
+  if (!clean) return null;
+  
+  try {
+    const resp = await fetch(`https://api.crossref.org/works/${encodeURIComponent(clean)}`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const msg = data.message;
+    
+    return {
+      title: msg.title ? msg.title[0] : '',
+      journal: msg['container-title'] ? msg['container-title'][0] : '',
+      issn: msg.ISSN ? msg.ISSN[0] : '',
+      doi: msg.DOI || clean
+    };
+  } catch(e) {
+    console.error('CrossRef error:', e);
+    return null;
+  }
+}
+
+// ==================== PDF Parse ====================
+async function parsePdf(file) {
+  if (!window.pdfjsLib) {
+    showToast('PDF解析库加载中，请稍后重试');
+    return null;
+  }
+  
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const meta = await pdf.getMetadata();
+    const info = meta.info || {};
+    
+    // Extract DOI from various possible fields
+    let doi = info.DOI || info.doi || '';
+    if (!doi) {
+      // Try to find DOI in first page text
+      const page = await pdf.getPage(1);
+      const text = await page.getTextContent();
+      const fullText = text.items.map(t => t.str).join(' ');
+      const doiMatch = fullText.match(/10\.\d{4,}\/[\w.\-+/()]+/i);
+      if (doiMatch) doi = doiMatch[0];
+    }
+    
+    return {
+      title: info.Title || '',
+      journal: info['Journal'] || info['Container-title'] || info['PrismPublicationName'] || '',
+      issn: info.ISSN || '',
+      doi: doi || ''
+    };
+  } catch(e) {
+    console.error('PDF parse error:', e);
+    return null;
+  }
+}
+
+// ==================== Render ====================
+function showResults(matches, source = '', pdfInfo = null) {
+  const el = $('results');
+  el.innerHTML = '';
+  
+  if (!matches.length) {
+    el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到匹配的期刊<br>请尝试用ISSN或完整期刊名搜索</div></div>`;
+    $('emptyState').classList.add('hidden');
+    return;
+  }
+  
+  $('emptyState').classList.add('hidden');
+  
+  // Source info
+  if (source) {
+    el.innerHTML += `<div style="font-size:12px;color:var(--sub);margin-bottom:8px">${source}</div>`;
+  }
+  
+  matches.forEach(m => {
+    const [name, issn, jcrQ, jif, xrCat, xrQ] = m;
+    
+    const jcrColor = jcrQ ? `qt-${jcrQ.toLowerCase()}` : '';
+    const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
+    
+    let html = `<div class="result-card">
+      <div class="result-title">${esc(name)}</div>
+      <div class="result-issn">${issn ? 'ISSN ' + issn : ''}</div>
+      <div class="result-grid">`;
+    
+    if (jcrQ || jif) {
+      html += `<div class="result-item">
+        <div class="label">JCR分区</div>
+        <div class="value ${jcrColor}">${jcrQ || '-'}</div>
+      </div>
+      <div class="result-item">
+        <div class="label">影响因子</div>
+        <div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div>
+      </div>`;
+    }
+    
+    if (xrCat || xrQ) {
+      html += `<div class="result-item">
+        <div class="label">新锐大类</div>
+        <div class="value" style="font-size:15px;color:var(--text)">${xrCat || '-'}</div>
+      </div>
+      <div class="result-item">
+        <div class="label">新锐分区</div>
+        <div class="value ${xrColorClass ? '' : ''}" style="color:var(--text)">${xrQ ? '<span class="badge ' + xrColorClass + '" style="font-size:14px;padding:4px 12px">' + xrQ + '</span>' : '-'}</div>
+      </div>`;
+    }
+    
+    html += `</div></div>`;
+    el.innerHTML += html;
+  });
+}
+
+// ==================== Event Handlers ====================
+// Mode switching
+$$('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    STATE.mode = btn.dataset.mode;
+    $$('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    ['modeName','modeDoi','modePdf'].forEach(id => $(id).classList.add('hidden'));
+    $(`mode${STATE.mode.charAt(0).toUpperCase() + STATE.mode.slice(1)}`).classList.remove('hidden');
+    $('suggestions').classList.remove('show');
+    $('results').innerHTML = '';
+    $('emptyState').classList.remove('hidden');
+  });
+});
+
+// Name search - live suggestions
+let suggResults = [];
+$('nameInput').addEventListener('input', debounce(function() {
+  const q = this.value;
+  if (q.length < 2) {
+    $('suggestions').classList.remove('show');
+    return;
+  }
+  suggResults = searchJournals(q);
+  showSuggestions(suggResults);
+}, 200));
+
+$('nameInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    const q = this.value.trim();
+    if (q.length >= 2) {
+      suggResults = searchJournals(q);
+      showResults(suggResults);
+      $('suggestions').classList.remove('show');
+    }
+  }
+});
+
+// Name input clear
+$('nameClearBtn').addEventListener('click', () => {
+  $('nameInput').value = '';
+  $('suggestions').classList.remove('show');
+  $('results').innerHTML = '';
+  $('emptyState').classList.remove('hidden');
+});
+
+$('nameInput').addEventListener('input', function() {
+  $('nameClearBtn').classList.toggle('hidden', !this.value);
+});
+
+// Suggestion click
+$('suggestions').addEventListener('click', function(e) {
+  const item = e.target.closest('.sug-item');
+  if (item) {
+    const idx = parseInt(item.dataset.idx);
+    if (suggResults[idx]) {
+      showResults([suggResults[idx]]);
+    }
+    this.classList.remove('show');
+  }
+});
+
+// DOI search
+$('doiBtn').addEventListener('click', async () => {
+  const doi = $('doiInput').value.trim();
+  if (!doi) return;
+  await doDoiSearch(doi);
+});
+
+$('doiInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doDoiSearch(this.value.trim());
+});
+
+async function doDoiSearch(doi) {
+  if (!doi) return;
+  showLoading('通过DOI查询期刊信息...');
+  
+  const info = await lookupDoi(doi);
+  hideLoading();
+  
+  if (!info || (!info.journal && !info.issn)) {
+    showResults([], '', null);
+    showToast('未找到该DOI对应的期刊信息');
+    return;
+  }
+  
+  // Search local database
+  let matches = [];
+  if (info.journal) matches = searchJournals(info.journal);
+  if (!matches.length && info.issn) {
+    matches = searchJournals(info.issn);
+  }
+  
+  const source = info.title ? `📄 ${esc(info.title)}<br>DOI: ${esc(doi)}` : `DOI: ${esc(doi)}`;
+  showResults(matches, source);
+}
+
+// PDF upload
+$('uploadArea').addEventListener('click', () => $('pdfInput').click());
+$('pdfInput').addEventListener('change', handlePdfFile);
+
+// Drag and drop
+$('uploadArea').addEventListener('dragover', e => {
+  e.preventDefault();
+  $('uploadArea').classList.add('drag');
+});
+$('uploadArea').addEventListener('dragleave', () => {
+  $('uploadArea').classList.remove('drag');
+});
+$('uploadArea').addEventListener('drop', e => {
+  e.preventDefault();
+  $('uploadArea').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) processPdf(file);
+});
+
+async function handlePdfFile(e) {
+  const file = e.target.files[0];
+  if (file) await processPdf(file);
+}
+
+async function processPdf(file) {
+  if (file.size > 20 * 1024 * 1024) {
+    showToast('PDF文件不能超过20MB');
+    return;
+  }
+  
+  showLoading('解析PDF中...');
+  const info = await parsePdf(file);
+  hideLoading();
+  
+  if (!info || (!info.journal && !info.doi && !info.issn)) {
+    showToast('未能从PDF中提取期刊信息，请尝试用期刊名搜索');
+    return;
+  }
+  
+  let source = '';
+  let matches = [];
+  
+  // Try DOI first
+  if (info.doi) {
+    source = `DOI: ${esc(info.doi)} `;
+    const crossrefInfo = await lookupDoi(info.doi);
+    if (crossrefInfo && crossrefInfo.journal) {
+      source += `→ ${esc(crossrefInfo.journal)}`;
+      matches = searchJournals(crossrefInfo.journal);
+      if (!matches.length && crossrefInfo.issn) {
+        matches = searchJournals(crossrefInfo.issn);
+      }
+    }
+  }
+  
+  // Fallback to journal name
+  if (!matches.length && info.journal) {
+    source = `PDF提取: ${esc(info.journal)}`;
+    matches = searchJournals(info.journal);
+  }
+  
+  if (!matches.length && info.issn) {
+    matches = searchJournals(info.issn);
+    source += ` (ISSN: ${info.issn})`;
+  }
+  
+  if (info.title) source += `<br>${esc(info.title)}`;
+  
+  showResults(matches, source, info);
+  $('pdfInput').value = '';
+}
+
+// ==================== UI Helpers ====================
+function $(id) { return document.getElementById(id); }
+function $$(sel) { return document.querySelectorAll(sel); }
+function esc(s) { const d=document.createElement('div');d.textContent=s;return d.innerHTML; }
+
+function showLoading(msg) {
+  $('loading').classList.remove('hidden');
+  $('loadingMsg').textContent = msg;
+  $('emptyState').classList.add('hidden');
+  $('results').innerHTML = '';
+}
+
+function hideLoading() {
+  $('loading').classList.add('hidden');
+}
+
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timeout);
+  t._timeout = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function debounce(fn, ms) {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
+// Click outside to close suggestions
+document.addEventListener('click', e => {
+  if (!e.target.closest('#modeName')) {
+    $('suggestions').classList.remove('show');
+  }
+});
+
+// Keyboard dismiss
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') $('suggestions').classList.remove('show');
+});
+
+// ==================== Init ====================
+loadData();
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

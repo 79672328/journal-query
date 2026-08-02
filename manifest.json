@@ -1,0 +1,22 @@
+{
+  "name": "期刊分区查询",
+  "short_name": "期刊分区",
+  "description": "快速查询期刊JCR分区、新锐分区和影响因子",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#1a73e8",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
