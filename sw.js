@@ -1,4 +1,4 @@
-const CACHE = 'jq-v2';
+const CACHE = 'jq-v3';
 const ASSETS = [
   './',
   'index.html',
@@ -9,8 +9,10 @@ const ASSETS = [
 const DATA_FILE = 'journal_data.json.gz';
 
 self.addEventListener('install', e => {
+  // Delete ALL old caches first to ensure clean state
   e.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(ASSETS))
+    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(() => caches.open(CACHE).then(c => c.addAll(ASSETS)))
   );
   self.skipWaiting();
 });
@@ -25,8 +27,8 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network-first for data file (always want fresh partition data)
-  if (e.request.url.endsWith(DATA_FILE)) {
+  // Network-only for data file (HTML already adds ?v=3 cache busting)
+  if (e.request.url.includes(DATA_FILE)) {
     e.respondWith(
       fetch(e.request).then(resp => {
         const clone = resp.clone();
