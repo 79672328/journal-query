@@ -1,12 +1,12 @@
-const CACHE = 'jq-v1';
+const CACHE = 'jq-v2';
 const ASSETS = [
   './',
   'index.html',
   'manifest.json',
-  'journal_data.json.gz',
   'icon-192.png',
   'icon-512.png'
 ];
+const DATA_FILE = 'journal_data.json.gz';
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -25,6 +25,17 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // Network-first for data file (always want fresh partition data)
+  if (e.request.url.endsWith(DATA_FILE)) {
+    e.respondWith(
+      fetch(e.request).then(resp => {
+        const clone = resp.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return resp;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
   // Cache-first for static assets
   if (ASSETS.some(a => e.request.url.endsWith(a))) {
     e.respondWith(
