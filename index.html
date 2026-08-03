@@ -154,7 +154,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <div class="upload-area" id="uploadArea">
         <div class="icon">📄</div>
         <div class="text" id="uploadText">点击或拖拽上传PDF</div>
-        <div class="hint">自动提取期刊信息，支持20MB以内PDF</div>
+        <div class="hint">自动提取期刊信息，支持50MB以内PDF</div>
       </div>
       <input type="file" id="pdfInput" accept=".pdf" class="hidden">
     </div>
@@ -820,14 +820,15 @@ async function handlePdfFile(e) {
 }
 
 async function processPdf(file) {
-  if (file.size > 20 * 1024 * 1024) {
-    showToast('PDF文件不能超过20MB');
+  if (file.size > 50 * 1024 * 1024) {
+    showToast('PDF文件不能超过50MB');
     $('uploadText').textContent = '点击或拖拽上传PDF';
     $('uploadText').style.color = '';
     return;
   }
   
-  showLoading('加载PDF解析引擎...');
+  $('loadingMsg').textContent = file.size > 20*1024*1024 ? '解析大型PDF中，可能需要几秒...' : '解析PDF中...';
+  showLoading($('loadingMsg').textContent);
   await loadPdfJs();
   if (!pdfJsLoaded) {
     showToast('PDF解析库加载失败，请用期刊名或DOI查询');
