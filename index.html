@@ -42,7 +42,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .input-row{display:flex;gap:8px}
 .input-row input{flex:1;height:44px;border:1.5px solid var(--border);border-radius:10px;padding:0 14px;font-size:15px;font-family:inherit;outline:none;transition:border .2s;-webkit-appearance:none}
 .input-row input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,115,232,.15)}
-.input-row input:focus-visible{outline:none}
+.input-row input:focus-visible,.input-row textarea:focus-visible{outline:none}
+#batchInput:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,115,232,.15)}
 .input-row button{height:44px;padding:0 20px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .2s;-webkit-appearance:none}
 .input-row button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .input-row button:active{background:var(--blue-h)}
@@ -124,9 +125,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
   <div class="input-card" id="inputCard">
     <!-- Name search -->
     <div id="modeName">
-      <div class="input-row" style="position:relative">
+      <div class="input-row" style="position:relative;margin-bottom:6px">
         <input type="text" id="nameInput" placeholder="输入期刊名称或ISSN..." autocomplete="off">
         <button id="nameClearBtn" class="hidden" style="background:#999;padding:0 14px">✕</button>
+        <button id="batchBtn" style="background:none;border:1px solid var(--border);color:var(--sub);padding:0 12px;font-size:12px;white-space:nowrap">批量</button>
+      </div>
+      <div id="batchArea" class="hidden" style="margin-top:6px">
+        <textarea id="batchInput" placeholder="一行一个期刊名或DOI&#10;例如：&#10;Safety Science&#10;10.1016/j.ssci.2023.106100&#10;Tunnelling and Underground Space Technology" 
+          style="width:100%;height:100px;border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;resize:vertical;outline:none;-webkit-appearance:none"></textarea>
+        <div class="input-row" style="margin-top:6px">
+          <button id="batchDoBtn" style="flex:1;height:44px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer;font-family:inherit">批量查询</button>
+        </div>
       </div>
       <div class="suggestions" id="suggestions"></div>
     </div>
@@ -134,9 +143,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     <!-- DOI search -->
     <div id="modeDoi" class="hidden">
       <div class="input-row">
-        <input type="text" id="doiInput" placeholder="输入DOI，如 10.1000/xyz123">
+        <input type="text" id="doiInput" placeholder="输入DOI或粘贴论文链接...">
         <button id="doiBtn">查询</button>
       </div>
+      <div class="hint" style="font-size:11px;color:#999;margin-top:6px;text-align:center">支持粘贴 sciencedirect.com / springer.com 等论文链接，自动提取DOI</div>
     </div>
 
     <!-- PDF upload -->
@@ -205,7 +215,7 @@ const STATE = {
 async function loadData() {
   try {
     $('stats').textContent = '加载数据库...';
-    const resp = await fetch('journal_data.json.gz?v=7');
+    const resp = await fetch('journal_data.json.gz?v=8');
     if (!resp.ok) throw new Error('Data fetch failed');
     const ds = new DecompressionStream('gzip');
     const stream = resp.body.pipeThrough(ds);
@@ -328,6 +338,92 @@ async function lookupDoi(doi) {
     console.error('CrossRef error:', e);
     return null;
   }
+}
+
+// ==================== URL → DOI Extraction ====================
+function extractDoiFromUrl(url) {
+  // Already a DOI
+  if (/^10\.\d{4,}\//.test(url)) return url.trim();
+  // doi.org redirects
+  const doiOrg = url.match(/doi\.org\/(10\.\d{4,}\/[\w.\-+/()]+)/i);
+  if (doiOrg) return doiOrg[1];
+  // Common publisher URL patterns
+  const patterns = [
+    /sciencedirect\.com\/science\/article\/(?:pii\/|abs\/)?([A-Z0-9]+)/i,
+    /link\.springer\.com\/article\/(10\.\d{4,}\/[\w.\-+/()]+)/i,
+    /mdpi\.com\/[\d.]+\/[\w-]+\/[\w-]+\/(\d+)/i,
+    /tandfonline\.com\/doi\/(?:full|abs|pdf)\/(10\.\d{4,}\/[\w.\-+/()]+)/i,
+    /wiley\.com\/doi\/(?:full|abs|pdf)\/(10\.\d{4,}\/[\w.\-+/()]+)/i,
+    /nature\.com\/articles\/([\w.-]+)/i,
+    /journals\.sagepub\.com\/doi\/(?:full|abs|pdf)\/(10\.\d{4,}\/[\w.\-+/()]+)/i,
+    /ieeexplore\.ieee\.org\/document\/(\d+)/i,
+    /doi\/(10\.\d{4,}\/[\w.\-+/()]+)/i,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m && /^10\./.test(m[1])) return m[1];
+    if (m) return m[0]; // Fallback: return matched segment
+  }
+  // Generic: find any DOI-like pattern in the URL
+  const doiMatch = url.match(/10\.\d{4,}\/[\w.\-+/()]+/i);
+  return doiMatch ? doiMatch[0] : null;
+}
+
+// ==================== Clipboard Check ====================
+async function checkClipboard() {
+  try {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      const text = await navigator.clipboard.readText();
+      if (!text) return;
+      const doi = extractDoiFromUrl(text.trim());
+      if (doi && doi.length > 8) {
+        $('doiInput').value = doi;
+        showToast(`检测到剪贴板中的DOI: ${doi.substring(0,25)}...`);
+      }
+    }
+  } catch(e) {} // Clipboard API may fail silently on some browsers
+}
+
+// ==================== Batch Search ====================
+async function doBatchSearch(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
+  if (!lines.length) { showToast('请输入至少一条查询'); return; }
+  if (lines.length > 20) { showToast('最多支持20条批量查询'); return; }
+  
+  $('results').innerHTML = '';
+  $('emptyState').classList.add('hidden');
+  showLoading(`批量查询 ${lines.length} 条...`);
+  
+  for (const line of lines) {
+    // Try as DOI first
+    const doi = extractDoiFromUrl(line);
+    if (doi && /^10\./.test(doi)) {
+      const info = await lookupDoi(doi);
+      if (info && info.journal) {
+        const exact = searchJournalsExact(info.journal);
+        let matches = exact ? [exact] : searchJournals(info.journal);
+        if (matches.length) {
+          showResults(matches, `DOI: ${esc(doi)} → ${esc(info.journal)}`);
+        } else {
+          showResults([], '', { journal: info.journal, title: info.title, doi: info.doi });
+        }
+      } else {
+        showResults([], '', { journal: line.substring(0, 40) });
+      }
+    } else {
+      // Journal name search
+      const exact = searchJournalsExact(line);
+      let matches = exact ? [exact] : searchJournals(line);
+      if (matches.length) {
+        showResults(matches, `搜索: ${esc(line)}`);
+      } else {
+        showResults([], '', { journal: line });
+      }
+    }
+    await new Promise(r => setTimeout(r, 400)); // Rate limit CrossRef
+  }
+  
+  hideLoading();
 }
 
 // ==================== PDF Parse ====================
@@ -520,6 +616,8 @@ $$('.mode-btn').forEach(btn => {
     $('suggestions').classList.remove('show');
     $('results').innerHTML = '';
     $('emptyState').classList.remove('hidden');
+    // Clipboard check when switching to DOI mode
+    if (STATE.mode === 'doi') checkClipboard();
   });
 });
 
@@ -588,6 +686,23 @@ $('nameInput').addEventListener('input', function() {
   $('nameClearBtn').classList.toggle('hidden', !this.value);
 });
 
+// Batch mode toggle
+$('batchBtn').addEventListener('click', () => {
+  const area = $('batchArea');
+  const isBatch = area.classList.contains('hidden');
+  area.classList.toggle('hidden', !isBatch);
+  $('nameInput').parentElement.style.display = isBatch ? 'none' : '';
+  $('batchBtn').textContent = isBatch ? '单条' : '批量';
+  $('suggestions').classList.remove('show');
+  if (isBatch) $('batchInput').focus();
+  else $('nameInput').focus();
+});
+
+// Batch search
+$('batchDoBtn').addEventListener('click', async () => {
+  await doBatchSearch($('batchInput').value);
+});
+
 // Suggestion click
 $('suggestions').addEventListener('click', function(e) {
   const item = e.target.closest('.sug-item');
@@ -605,6 +720,18 @@ $('doiBtn').addEventListener('click', async () => {
   const doi = $('doiInput').value.trim();
   if (!doi) return;
   await doDoiSearch(doi);
+});
+
+$('doiInput').addEventListener('input', function() {
+  const v = this.value.trim();
+  // Auto-detect URLs and extract DOI
+  if (v.includes('://') || v.includes('doi.org')) {
+    const doi = extractDoiFromUrl(v);
+    if (doi && doi !== v) {
+      this.value = doi;
+      showToast('已自动提取DOI');
+    }
+  }
 });
 
 $('doiInput').addEventListener('keydown', function(e) {
@@ -808,7 +935,7 @@ loadData();
 
 // Register service worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js?v=7').catch(() => {});
+  navigator.serviceWorker.register('sw.js?v=8').catch(() => {});
 }
 </script>
 </body>
