@@ -154,9 +154,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <div class="upload-area" id="uploadArea">
         <div class="icon">📄</div>
         <div class="text" id="uploadText">点击或拖拽上传PDF</div>
-        <div class="hint">自动提取期刊信息，支持50MB以内PDF</div>
+        <div class="hint">自动提取期刊信息，支持80MB内PDF，可多选</div>
       </div>
-      <input type="file" id="pdfInput" accept=".pdf" class="hidden">
+      <input type="file" id="pdfInput" accept=".pdf" multiple class="hidden">
     </div>
   </div>
 
@@ -811,19 +811,21 @@ $('uploadArea').addEventListener('drop', e => {
 });
 
 async function handlePdfFile(e) {
-  const file = e.target.files[0];
-  if (file) {
-    $('uploadText').textContent = `已选择: ${file.name}`;
-    $('uploadText').style.color = 'var(--blue)';
-    await processPdf(file);
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  $('uploadText').textContent = files.length > 1 ? `已选择 ${files.length} 个PDF` : `已选择: ${files[0].name}`;
+  $('uploadText').style.color = 'var(--blue)';
+  for (let i = 0; i < files.length; i++) {
+    await processPdf(files[i], i + 1, files.length);
   }
+  $('pdfInput').value = '';
+  $('uploadText').textContent = '点击或拖拽上传PDF';
+  $('uploadText').style.color = '';
 }
 
-async function processPdf(file) {
-  if (file.size > 50 * 1024 * 1024) {
-    showToast('PDF文件不能超过50MB');
-    $('uploadText').textContent = '点击或拖拽上传PDF';
-    $('uploadText').style.color = '';
+async function processPdf(file, idx = 1, total = 1) {
+  if (file.size > 80 * 1024 * 1024) {
+    showToast(`${file.name.substring(0,30)} 超过80MB，已跳过`);
     return;
   }
   
@@ -883,9 +885,6 @@ async function processPdf(file) {
       }
       if (!matches.length) {
         showResults([], source, crossrefInfo);
-        $('pdfInput').value = '';
-        $('uploadText').textContent = '点击或拖拽上传PDF';
-        $('uploadText').style.color = '';
         return;
       }
     }
@@ -920,9 +919,6 @@ async function processPdf(file) {
   if (info.title) source += `<br>${esc(info.title)}`;
   
   showResults(matches, source);
-  $('pdfInput').value = '';
-  $('uploadText').textContent = '点击或拖拽上传PDF';
-  $('uploadText').style.color = '';
 }
 
 // ==================== UI Helpers ====================
