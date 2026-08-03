@@ -215,7 +215,7 @@ const STATE = {
 async function loadData() {
   try {
     $('stats').textContent = '加载数据库...';
-    const resp = await fetch('journal_data.json.gz?v=8');
+    const resp = await fetch('journal_data.json.gz?v=9');
     if (!resp.ok) throw new Error('Data fetch failed');
     const ds = new DecompressionStream('gzip');
     const stream = resp.body.pipeThrough(ds);
@@ -225,8 +225,8 @@ async function loadData() {
     STATE.journals = data.journals;
     STATE.total = data.total;
     STATE.updated = data.updated;
-    // Build search index: lowercase names for fast filtering
-    STATE.namesLower = STATE.journals.map(j => (j[0] || '').toLowerCase());
+    // Build search index: normalized names for matching
+    STATE.namesLower = STATE.journals.map(j => normalizeName(j[0] || ''));
     STATE.loaded = true;
     $('stats').textContent = `已加载 ${data.total.toLocaleString()} 条期刊数据 · ${data.updated}`;
   } catch(e) {
@@ -236,10 +236,19 @@ async function loadData() {
   }
 }
 
+// ==================== Name Normalization ====================
+function normalizeName(name) {
+  return name.toLowerCase().trim()
+    .replace(/&amp;/g, 'and')
+    .replace(/&/g, 'and')
+    .replace(/  +/g, ' ')
+    .replace(/[–—]/g, '-');
+}
+
 // ==================== Search ====================
 function searchJournals(query) {
   if (!query || query.length < 2) return [];
-  const q = query.toLowerCase().trim();
+  const q = normalizeName(query);
   const byIssn = q.replace(/[^0-9]/g, '');
   const names = STATE.namesLower;
   const journals = STATE.journals;
@@ -261,7 +270,6 @@ function searchJournals(query) {
       const issn = (journals[i][1] || '').replace(/-/g, '');
       if (issn.indexOf(byIssn) !== -1) matched = true;
     }
-    // Word-by-word fallback
     if (!matched) {
       const words = qs[0].split(/\s+/).filter(w => w.length > 2);
       if (words.length && words.every(w => name.indexOf(w) !== -1)) matched = true;
@@ -273,7 +281,6 @@ function searchJournals(query) {
     }
   }
   
-  // Sort by match quality
   results.sort((a, b) => {
     const aName = names[a.idx];
     const bName = names[b.idx];
@@ -286,10 +293,19 @@ function searchJournals(query) {
   return results.map(r => r.j);
 }
 
-// Exact match — uses precomputed index
+// Exact match — uses normalized names + &/and swap
 function searchJournalsExact(name) {
   if (!name) return null;
-  const q = name.toLowerCase().trim();
+  const q = normalizeName(name);
+  const idx = STATE.namesLower.indexOf(q);
+  if (idx !== -1) return STATE.journals[idx];
+  const qAlt = q.includes('and') ? q.replace(' and ', ' & ') : q.replace(' & ', ' and ');
+  if (qAlt !== q) {
+    const idx2 = STATE.namesLower.indexOf(qAlt);
+    if (idx2 !== -1) return STATE.journals[idx2];
+  }
+  return null;
+}
   const idx = STATE.namesLower.indexOf(q);
   return idx !== -1 ? STATE.journals[idx] : null;
 }
@@ -347,26 +363,35 @@ function extractDoiFromUrl(url) {
   // doi.org redirects
   const doiOrg = url.match(/doi\.org\/(10\.\d{4,}\/[\w.\-+/()]+)/i);
   if (doiOrg) return doiOrg[1];
-  // Common publisher URL patterns
+  // Common publisher URL patterns (only those that contain actual DOIs)
   const patterns = [
-    /sciencedirect\.com\/science\/article\/(?:pii\/|abs\/)?([A-Z0-9]+)/i,
+    // These URLs embed the DOI directly
     /link\.springer\.com\/article\/(10\.\d{4,}\/[\w.\-+/()]+)/i,
-    /mdpi\.com\/[\d.]+\/[\w-]+\/[\w-]+\/(\d+)/i,
     /tandfonline\.com\/doi\/(?:full|abs|pdf)\/(10\.\d{4,}\/[\w.\-+/()]+)/i,
     /wiley\.com\/doi\/(?:full|abs|pdf)\/(10\.\d{4,}\/[\w.\-+/()]+)/i,
     /nature\.com\/articles\/([\w.-]+)/i,
     /journals\.sagepub\.com\/doi\/(?:full|abs|pdf)\/(10\.\d{4,}\/[\w.\-+/()]+)/i,
-    /ieeexplore\.ieee\.org\/document\/(\d+)/i,
     /doi\/(10\.\d{4,}\/[\w.\-+/()]+)/i,
+    // Sciencedirect PII codes are NOT DOIs - skip them
+    // mdpi ISSN-based URLs may not have DOI - try generic below
   ];
   for (const p of patterns) {
     const m = url.match(p);
     if (m && /^10\./.test(m[1])) return m[1];
-    if (m) return m[0]; // Fallback: return matched segment
   }
   // Generic: find any DOI-like pattern in the URL
   const doiMatch = url.match(/10\.\d{4,}\/[\w.\-+/()]+/i);
-  return doiMatch ? doiMatch[0] : null;
+  if (doiMatch) return doiMatch[0];
+  // Detect known publisher URLs that lack DOIs
+  if (/sciencedirect\.com\/science\/article\/pii\//i.test(url)) {
+    showToast('此 ScienceDirect 链接不含DOI，请打开论文页面复制DOI');
+    return null;
+  }
+  if (/mdpi\.com/i.test(url) || /ieeexplore\.ieee\.org/i.test(url)) {
+    showToast('此链接中未检测到DOI，请手动复制DOI');
+    return null;
+  }
+  return null;
 }
 
 // ==================== Clipboard Check ====================
@@ -935,7 +960,7 @@ loadData();
 
 // Register service worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js?v=8').catch(() => {});
+  navigator.serviceWorker.register('sw.js?v=9').catch(() => {});
 }
 </script>
 </body>
