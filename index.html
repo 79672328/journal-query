@@ -601,30 +601,47 @@ function showResults(matches, source = '', unknownJournal = null) {
   
   $('emptyState').classList.add('hidden');
   
-  // Source info
+  // Source info + result count
+  const frag = document.createDocumentFragment();
   if (source) {
-    el.innerHTML += `<div style="font-size:12px;color:var(--sub);margin-bottom:8px">${source}</div>`;
+    const srcDiv = document.createElement('div');
+    srcDiv.style.cssText = 'font-size:12px;color:var(--sub);margin-bottom:8px';
+    srcDiv.innerHTML = source;
+    frag.appendChild(srcDiv);
+  }
+  if (matches.length > 1) {
+    const cntDiv = document.createElement('div');
+    cntDiv.style.cssText = 'text-align:center;font-size:11px;color:#aaa;margin-bottom:8px';
+    cntDiv.textContent = `共 ${matches.length} 条结果`;
+    frag.appendChild(cntDiv);
   }
   
   const MAX_VISIBLE = 5;
   const showAll = matches.length <= MAX_VISIBLE;
   const visible = showAll ? matches : matches.slice(0, MAX_VISIBLE);
   
-  visible.forEach(m => {
-    el.innerHTML += renderCard(m);
-  });
+  const wrapper = document.createElement('div');
+  visible.forEach(m => { wrapper.innerHTML += renderCard(m); });
+  frag.appendChild(wrapper);
   
-  // Show "expand" button if there are more results
   if (!showAll) {
-    el.innerHTML += `<div style="text-align:center;padding:8px">
-      <button onclick="this.remove();document.querySelectorAll('.result-folded').forEach(el=>{el.style.display='';el.style.animation='fadeIn .3s ease'})" 
-        style="background:none;border:1px solid var(--blue);color:var(--blue);padding:8px 24px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit">
-        显示全部 ${matches.length} 条结果
-      </button></div>`;
+    const btnDiv = document.createElement('div');
+    btnDiv.style.cssText = 'text-align:center;padding:8px';
+    btnDiv.innerHTML = `<button onclick="this.remove();document.querySelectorAll('.result-folded').forEach(el=>{el.style.display='';el.style.animation='fadeIn .3s ease'})"
+      style="background:none;border:1px solid var(--blue);color:var(--blue);padding:8px 24px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit">
+      显示全部 ${matches.length} 条结果</button>`;
+    frag.appendChild(btnDiv);
+    const hiddenWrap = document.createElement('div');
     for (let i = MAX_VISIBLE; i < matches.length; i++) {
-      el.innerHTML += renderCard(matches[i], 'result-folded');
+      hiddenWrap.innerHTML += renderCard(matches[i], 'result-folded');
     }
+    frag.appendChild(hiddenWrap);
   }
+  
+  el.innerHTML = '';
+  el.appendChild(frag);
+  // Auto-scroll to results
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ==================== Event Handlers ====================
@@ -639,8 +656,9 @@ $$('.mode-btn').forEach(btn => {
     $('suggestions').classList.remove('show');
     $('results').innerHTML = '';
     $('emptyState').classList.remove('hidden');
-    // Clipboard check when switching to DOI mode
-    if (STATE.mode === 'doi') checkClipboard();
+    // Auto-focus input for each mode
+    if (STATE.mode === 'name') $('nameInput').focus();
+    if (STATE.mode === 'doi') { $('doiInput').focus(); checkClipboard(); }
   });
 });
 
@@ -657,7 +675,7 @@ $('nameInput').addEventListener('input', debounce(function() {
   suggResults = searchJournals(q);
   suggIndex = -1;
   showSuggestions(suggResults);
-}, 200));
+}, 120));
 
 $('nameInput').addEventListener('keydown', function(e) {
   const sugEl = $('suggestions');
@@ -774,15 +792,17 @@ async function doDoiSearch(doi) {
     return;
   }
   
-  // Search local database: exact match first
+  // Search local database: ISSN first (most reliable), then exact name
   let matches = [];
-  if (info.journal) {
-    const exact = searchJournalsExact(info.journal);
-    if (exact) { matches = [exact]; }
+  if (info.issn) {
+    const cleanIssn = info.issn.replace(/-/g, '');
+    matches = STATE.journals.filter(j => (j[1] || '').replace(/-/g, '') === cleanIssn).slice(0, 1);
+  }
+  if (!matches.length && info.journal) {
+    matches = [searchJournalsExact(info.journal)].filter(Boolean);
   }
   // Fallback to broad search
   if (!matches.length && info.journal) matches = searchJournals(info.journal);
-  if (!matches.length && info.issn) matches = searchJournals(info.issn);
   
   const source = info.title ? `📄 ${esc(info.title)}<br>DOI: ${esc(doi)}` : `DOI: ${esc(doi)}`;
   if (!matches.length) {
