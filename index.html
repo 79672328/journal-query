@@ -215,7 +215,7 @@ const STATE = {
 async function loadData() {
   try {
     $('stats').textContent = '加载数据库...';
-    const resp = await fetch('journal_data.json.gz?v=12');
+    const resp = await fetch('journal_data.json.gz');
     if (!resp.ok) throw new Error('Data fetch failed');
     const ds = new DecompressionStream('gzip');
     const stream = resp.body.pipeThrough(ds);
@@ -973,7 +973,7 @@ loadData();
 
 // Register service worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js?v=12').catch(() => {});
+  navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 </script>
 </body>
