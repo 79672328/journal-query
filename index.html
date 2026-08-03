@@ -239,6 +239,7 @@ async function loadData() {
 // ==================== Name Normalization ====================
 function normalizeName(name) {
   return name.toLowerCase().trim()
+    .replace(/^the\s+/i, '')       // strip leading "The "
     .replace(/&amp;/g, 'and')
     .replace(/&/g, 'and')
     .replace(/  +/g, ' ')
