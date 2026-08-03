@@ -205,7 +205,7 @@ const STATE = {
 async function loadData() {
   try {
     $('stats').textContent = '加载数据库...';
-    const resp = await fetch('journal_data.json.gz?v=6');
+    const resp = await fetch('journal_data.json.gz?v=7');
     if (!resp.ok) throw new Error('Data fetch failed');
     const ds = new DecompressionStream('gzip');
     const stream = resp.body.pipeThrough(ds);
@@ -393,6 +393,7 @@ function renderCard(m, extraClass = '') {
   const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
   const jcrColorClass = jcrQ ? 'badge-' + jcrQ.toLowerCase() : '';
   const wosBadge = wosIdx ? wosIdx.split(' | ').map(i => `<span style="display:inline-block;background:#e8f5e9;color:#2e7d32;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;margin:0 2px">${i}</span>`).join('') : '';
+  const wosSubjShort = wosSubj ? wosSubj.split(' | ').slice(0, 3).join(' · ') : '';
   
   let h = `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
     <div class="result-title">${esc(name)}</div>
@@ -419,8 +420,14 @@ function renderCard(m, extraClass = '') {
   h += `<div class="result-item">
       <div class="label">影响因子</div>
       <div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div>
-    </div>
-  </div></div>`;
+    </div>`;
+  if (wosSubjShort) {
+    h += `<div class="result-item full" style="padding:8px 12px;text-align:left">
+      <div class="label" style="margin-bottom:2px">WoS学科</div>
+      <div class="value" style="font-size:12px;font-weight:400;color:var(--sub)">${esc(wosSubjShort)}</div>
+    </div>`;
+  }
+  h += `</div></div>`;
   return h;
 }
 
@@ -801,7 +808,7 @@ loadData();
 
 // Register service worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js?v=6').catch(() => {});
+  navigator.serviceWorker.register('sw.js?v=7').catch(() => {});
 }
 </script>
 </body>
