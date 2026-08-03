@@ -860,21 +860,6 @@ async function handlePdfFile(e) {
     }
   }
   
-  // If multiple results, wrap for responsive layout
-  const allCards = $('results').querySelectorAll('.result-card');
-  if (allCards.length > 1) {
-    const existing = $('results').innerHTML;
-    $('results').innerHTML = `<div class="multi-results">${existing}</div>`;
-  }
-  
-  // Debug: show card count at the TOP (visible immediately)
-  if (allCards.length >= 1) {
-    const cnt = document.createElement('div');
-    cnt.style.cssText = 'background:#e8f5e9;color:#2e7d32;text-align:center;padding:8px;border-radius:8px;margin-bottom:12px;font-size:14px;font-weight:600';
-    cnt.textContent = `✓ 已处理 ${allCards.length} 个结果`;
-    $('results').insertBefore(cnt, $('results').firstChild);
-  }
-  
   $('pdfInput').value = '';
   $('uploadText').textContent = '点击或拖拽上传PDF';
   $('uploadText').style.color = '';
