@@ -205,7 +205,7 @@ const STATE = {
 async function loadData() {
   try {
     $('stats').textContent = '加载数据库...';
-    const resp = await fetch('journal_data.json.gz?v=4');
+    const resp = await fetch('journal_data.json.gz?v=5');
     if (!resp.ok) throw new Error('Data fetch failed');
     const ds = new DecompressionStream('gzip');
     const stream = resp.body.pipeThrough(ds);
@@ -389,8 +389,9 @@ async function parsePdf(file) {
 
 // ==================== Render ====================
 function renderCard(m, extraClass = '') {
-  const [name, issn, jif, xrCat, xrQ, wosIdx, wosSubj] = m;
+  const [name, issn, jif, jcrQ, xrCat, xrQ, wosIdx, wosSubj] = m;
   const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
+  const jcrColorClass = jcrQ ? 'badge-' + jcrQ.toLowerCase() : '';
   const wosBadge = wosIdx ? wosIdx.split(' | ').map(i => `<span style="display:inline-block;background:#e8f5e9;color:#2e7d32;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;margin:0 2px">${i}</span>`).join('') : '';
   const wosSubjShort = wosSubj ? wosSubj.split(' | ').slice(0, 3).join(' · ') : '';
   
@@ -402,10 +403,18 @@ function renderCard(m, extraClass = '') {
     h += `<div class="result-item full">
       <div class="label">新锐分区</div>
       <div class="value">${xrQ ? '<span class="badge ' + xrColorClass + '" style="font-size:18px;padding:6px 20px">' + xrQ + '</span>' : '-'}</div>
-    </div>
-    <div class="result-item">
+    </div>`;
+  }
+  if (jcrQ) {
+    h += `<div class="result-item">
+      <div class="label">JCR分区</div>
+      <div class="value">${'<span class="badge ' + jcrColorClass + '" style="font-size:15px;padding:4px 14px">' + jcrQ + '</span>'}</div>
+    </div>`;
+  }
+  if (xrCat) {
+    h += `<div class="result-item">
       <div class="label">新锐大类</div>
-      <div class="value" style="font-size:16px;color:var(--text)">${xrCat || '-'}</div>
+      <div class="value" style="font-size:${jcrQ ? '14px' : '16px'};color:var(--text)">${xrCat}</div>
     </div>`;
   }
   h += `<div class="result-item">
@@ -799,7 +808,7 @@ loadData();
 
 // Register service worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js?v=4').catch(() => {});
+  navigator.serviceWorker.register('sw.js?v=5').catch(() => {});
 }
 </script>
 </body>
