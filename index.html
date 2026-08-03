@@ -929,7 +929,17 @@ async function processPdf(file, idx = 1, total = 1) {
         matches = searchJournals(crossrefInfo.issn);
       }
       if (!matches.length) {
-        showResults([], source, crossrefInfo, appendMode);
+        if (appendMode) {
+          // Fast append for multi-PDF: skip showResults flow
+          const cn = crossrefInfo.journal || crossrefInfo.title || '未知期刊';
+          $('results').insertAdjacentHTML('beforeend',
+            `<div class="result-card" style="border-left:3px solid #e67e22;margin-bottom:12px">
+              <div class="result-title">${esc(cn)}</div>
+              <div style="font-size:12px;color:#e67e22;text-align:center;padding:8px">暂未收录</div>
+            </div>`);
+        } else {
+          showResults([], source, crossrefInfo);
+        }
         return;
       }
     }
@@ -940,7 +950,15 @@ async function processPdf(file, idx = 1, total = 1) {
     source = `PDF提取: ${esc(info.journal)}`;
     matches = searchJournals(info.journal);
     if (!matches.length) {
-      showResults([], source, { journal: info.journal, title: info.title, doi: info.doi }, appendMode);
+      if (appendMode) {
+        $('results').insertAdjacentHTML('beforeend',
+          `<div class="result-card" style="border-left:3px solid #e67e22;margin-bottom:12px">
+            <div class="result-title">${esc(info.journal || info.title || '未知期刊')}</div>
+            <div style="font-size:12px;color:#e67e22;text-align:center;padding:8px">暂未收录</div>
+          </div>`);
+      } else {
+        showResults([], source, { journal: info.journal, title: info.title, doi: info.doi });
+      }
       return;
     }
   }
@@ -951,12 +969,26 @@ async function processPdf(file, idx = 1, total = 1) {
   }
   
   if (!matches.length) {
-    showResults([], source, info, appendMode);
+    if (appendMode) {
+      $('results').insertAdjacentHTML('beforeend',
+        `<div class="result-card" style="margin-bottom:12px">
+          <div class="result-title">${esc(info.journal || info.title || '未识别期刊')}</div>
+          <div style="font-size:12px;color:var(--sub);text-align:center;padding:8px">未能匹配到数据库</div>
+        </div>`);
+    } else {
+      showResults([], source, info);
+    }
     return;
   }
   
   if (info.title) source += `<br>${esc(info.title)}`;
-  showResults(matches, source, false, appendMode);
+  if (appendMode) {
+    // Fast append for multi-PDF
+    const sep = `<div style="font-size:11px;color:#aaa;padding:4px 0 8px">${source}</div>`;
+    $('results').insertAdjacentHTML('beforeend', sep + matches.map(m => renderCard(m)).join(''));
+  } else {
+    showResults(matches, source);
+  }
 }
 
 // ==================== UI Helpers ====================
