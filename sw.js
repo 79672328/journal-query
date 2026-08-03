@@ -1,4 +1,4 @@
-const CACHE = 'jq-v9';
+const CACHE = 'jq-v10';
 const ASSETS = [
   './',
   'index.html',

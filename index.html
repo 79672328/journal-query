@@ -215,7 +215,7 @@ const STATE = {
 async function loadData() {
   try {
     $('stats').textContent = '加载数据库...';
-    const resp = await fetch('journal_data.json.gz?v=9');
+    const resp = await fetch('journal_data.json.gz?v=10');
     if (!resp.ok) throw new Error('Data fetch failed');
     const ds = new DecompressionStream('gzip');
     const stream = resp.body.pipeThrough(ds);
@@ -844,7 +844,23 @@ async function processPdf(file) {
   hideLoading();
   
   if (!info || (!info.journal && !info.doi && !info.issn)) {
-    showToast('未能从PDF中提取期刊信息，请尝试用期刊名搜索');
+    $('results').innerHTML = `<div class="result-card" style="border-left:3px solid #1a73e8">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <div style="font-size:24px;flex-shrink:0">📋</div>
+        <div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px">此PDF未包含期刊元数据</div>
+          <div style="font-size:13px;color:var(--sub);line-height:1.6">
+            这个PDF可能是自己导出的投稿稿，缺少出版商附带的隐藏信息。<br><br>
+            <span style="font-weight:500;color:var(--text)">试试以下方式：</span><br>
+            &nbsp;1.&nbsp; 切换到「<span style="color:var(--blue);font-weight:500">期刊名</span>」模式，直接输入期刊名称<br>
+            &nbsp;2.&nbsp; 切换到「<span style="color:var(--blue);font-weight:500">DOI</span>」模式，粘贴论文的DOI号<br>
+            &nbsp;3.&nbsp; 如果用出版社发给你的原始PDF上传，通常可以直接识别<br>
+            &nbsp;4.&nbsp; 或使用「<span style="color:var(--blue);font-weight:500">批量</span>」模式一次查多个期刊
+          </div>
+        </div>
+      </div>
+    </div>`;
+    $('emptyState').classList.add('hidden');
     return;
   }
   
@@ -960,7 +976,7 @@ loadData();
 
 // Register service worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js?v=9').catch(() => {});
+  navigator.serviceWorker.register('sw.js?v=10').catch(() => {});
 }
 </script>
 </body>
