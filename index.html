@@ -181,7 +181,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 
   <!-- Data status -->
   <div class="stats" id="stats"></div>
-  <div class="stats" style="padding-top:0;color:#bbb">数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
+  <div class="stats" style="padding-top:0;color:#bbb">v11 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -861,11 +861,19 @@ async function handlePdfFile(e) {
   }
   
   // If multiple results, wrap for responsive layout
-  const cards = $('results').querySelectorAll('.result-card');
-  if (cards.length > 1) {
+  const allCards = $('results').querySelectorAll('.result-card');
+  if (allCards.length > 1) {
     // Just wrap existing content — no HTML reconstruction
     const existing = $('results').innerHTML;
     $('results').innerHTML = `<div class="multi-results">${existing}</div>`;
+  }
+  
+  // Debug: show card count
+  if (allCards.length >= 1) {
+    const cnt = document.createElement('div');
+    cnt.style.cssText = 'text-align:center;font-size:11px;color:#4caf50;padding:4px';
+    cnt.textContent = `已处理 ${allCards.length} 个结果`;
+    $('results').appendChild(cnt);
   }
   
   $('pdfInput').value = '';
