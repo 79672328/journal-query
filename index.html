@@ -102,23 +102,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
   .result-grid{grid-template-columns:1fr;gap:8px}
   .result-item .value{font-size:18px}
 }
-/* Carousel (mobile only) */
-.carousel-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;gap:0}
-.carousel-track::-webkit-scrollbar{display:none}
-.carousel-slide{flex:0 0 100%;scroll-snap-align:start;padding:0 2px}
-.carousel-slide .result-card{margin:0 auto;max-width:500px}
-.carousel-dots{display:flex;justify-content:center;gap:6px;padding:8px 0}
-.carousel-dot{width:8px;height:8px;border-radius:50%;background:#ccc;cursor:pointer;transition:background .2s}
-.carousel-dot.active{background:var(--blue)}
-
-/* PC: turn carousel into vertical list */
-@media (min-width:768px){
-  .carousel-track{display:block;overflow:visible}
-  .carousel-slide{display:block;padding:0;margin-bottom:12px}
-  .carousel-slide .result-card{max-width:500px;margin:0 0 12px auto}
-  .carousel-dots{display:none}
-  .list-view-btn{display:none}
-}
+/* Multi-result responsive wrapper */
+.multi-results{max-width:100%}
+.multi-results .result-card{max-width:500px;margin-left:auto;margin-right:auto}
 
 </style>
 </head>
@@ -874,52 +860,12 @@ async function handlePdfFile(e) {
     }
   }
   
-  // If multiple results, wrap in carousel
+  // If multiple results, wrap for responsive layout
   const cards = $('results').querySelectorAll('.result-card');
   if (cards.length > 1) {
-    // Group cards by source divs (each processPdf call may add a source + cards)
-    const groups = [];
-    let currentGroup = [];
-    for (const node of $('results').children) {
-      if (node.classList.contains('result-card')) {
-        currentGroup.push(node.outerHTML);
-      } else {
-        if (currentGroup.length) { groups.push(currentGroup.join('')); currentGroup = []; }
-        // Include source text div
-        if (node.tagName === 'DIV' && !node.classList.contains('carousel-container')) {
-          currentGroup.push(node.outerHTML);
-        }
-      }
-    }
-    if (currentGroup.length) groups.push(currentGroup.join(''));
-    
-    // Build slides
-    let slidesHtml = '';
-    let dotsHtml = '';
-    for (let i = 0; i < groups.length; i++) {
-      slidesHtml += `<div class="carousel-slide">${groups[i]}</div>`;
-      dotsHtml += `<span class="carousel-dot${i === 0 ? ' active' : ''}" onclick="document.getElementById('carouselTrack').scrollTo({left:document.querySelector('.carousel-slide').offsetWidth*${i},behavior:'smooth'})"></span>`;
-    }
-    
-    $('results').innerHTML = 
-      `<div class="carousel-track" id="carouselTrack">${slidesHtml}</div>
-      <div class="carousel-dots">${dotsHtml}</div>
-      <div style="text-align:center;padding:4px">
-        <button class="list-view-btn" onclick="var t=document.getElementById('carouselTrack');t.style.display='block';t.style.overflow='visible';this.style.display='none';document.querySelector('.carousel-dots').style.display='none';Array.from(t.children).forEach(c=>{c.style.display='block';c.style.padding='0';c.style.marginBottom='12px'})"
-          style="background:none;border:1px solid var(--blue);color:var(--blue);padding:4px 16px;border-radius:14px;font-size:12px;cursor:pointer;font-family:inherit">列表视图</button>
-      </div>`;
-    
-    // Scroll snap listener for dots
-    setTimeout(() => {
-      const track = $('carouselTrack');
-      if (track) {
-        track.addEventListener('scroll', () => {
-          const slideW = track.querySelector('.carousel-slide').offsetWidth;
-          const idx = Math.round(track.scrollLeft / slideW);
-          document.querySelectorAll('.carousel-dot').forEach((d,i) => d.classList.toggle('active', i === idx));
-        });
-      }
-    }, 100);
+    // Just wrap existing content — no HTML reconstruction
+    const existing = $('results').innerHTML;
+    $('results').innerHTML = `<div class="multi-results">${existing}</div>`;
   }
   
   $('pdfInput').value = '';
