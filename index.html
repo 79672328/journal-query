@@ -215,7 +215,7 @@ const STATE = {
 async function loadData() {
   try {
     $('stats').textContent = '加载数据库...';
-    const resp = await fetch('journal_data.json.gz?v=10');
+    const resp = await fetch('journal_data.json.gz?v=11');
     if (!resp.ok) throw new Error('Data fetch failed');
     const ds = new DecompressionStream('gzip');
     const stream = resp.body.pipeThrough(ds);
@@ -305,9 +305,6 @@ function searchJournalsExact(name) {
     if (idx2 !== -1) return STATE.journals[idx2];
   }
   return null;
-}
-  const idx = STATE.namesLower.indexOf(q);
-  return idx !== -1 ? STATE.journals[idx] : null;
 }
 
 function showSuggestions(results) {
@@ -976,7 +973,7 @@ loadData();
 
 // Register service worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js?v=10').catch(() => {});
+  navigator.serviceWorker.register('sw.js?v=11').catch(() => {});
 }
 </script>
 </body>
