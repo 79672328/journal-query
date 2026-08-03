@@ -588,7 +588,10 @@ function showResults(matches, source = '', unknownJournal = null, append = false
     </div></div>`;
     
     if (source) {
-      el.innerHTML = `<div style="font-size:12px;color:var(--sub);margin-bottom:8px">${source}</div>` + html;
+      html = `<div style="font-size:12px;color:var(--sub);margin-bottom:8px">${source}</div>` + html;
+    }
+    if (append) {
+      el.insertAdjacentHTML('beforeend', html);
     } else {
       el.innerHTML = html;
     }
@@ -597,8 +600,10 @@ function showResults(matches, source = '', unknownJournal = null, append = false
   
   // Case: no matches at all
   if (!matches.length) {
-    el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到匹配的期刊<br>请尝试用ISSN或完整期刊名搜索</div></div>`;
-    $('emptyState').classList.add('hidden');
+    if (!append) {
+      el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到匹配的期刊<br>请尝试用ISSN或完整期刊名搜索</div></div>`;
+      $('emptyState').classList.add('hidden');
+    }
     return;
   }
   

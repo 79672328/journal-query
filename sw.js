@@ -1,6 +1,6 @@
 // Service Worker — network-first for code, cache-first for assets
 // Bumping VERSION forces cache refresh on next page load
-const VERSION = '6';
+const VERSION = '7';
 const CACHE = 'jq-v1.' + VERSION;
 
 // Static assets that never change between deploys (cached)
