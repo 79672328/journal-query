@@ -102,7 +102,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
   .result-grid{grid-template-columns:1fr;gap:8px}
   .result-item .value{font-size:18px}
 }
-/* Carousel */
+/* Carousel (mobile only) */
 .carousel-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;gap:0}
 .carousel-track::-webkit-scrollbar{display:none}
 .carousel-slide{flex:0 0 100%;scroll-snap-align:start;padding:0 2px}
@@ -110,6 +110,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .carousel-dots{display:flex;justify-content:center;gap:6px;padding:8px 0}
 .carousel-dot{width:8px;height:8px;border-radius:50%;background:#ccc;cursor:pointer;transition:background .2s}
 .carousel-dot.active{background:var(--blue)}
+
+/* PC: turn carousel into vertical list */
+@media (min-width:768px){
+  .carousel-track{display:block;overflow:visible}
+  .carousel-slide{display:block;padding:0;margin-bottom:12px}
+  .carousel-slide .result-card{max-width:500px;margin:0 0 12px auto}
+  .carousel-dots{display:none}
+  .list-view-btn{display:none}
+}
 
 </style>
 </head>
