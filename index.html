@@ -102,6 +102,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
   .result-grid{grid-template-columns:1fr;gap:8px}
   .result-item .value{font-size:18px}
 }
+/* Carousel */
+.carousel-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;gap:0}
+.carousel-track::-webkit-scrollbar{display:none}
+.carousel-slide{flex:0 0 100%;scroll-snap-align:start;padding:0 2px}
+.carousel-slide .result-card{margin:0 auto;max-width:500px}
+.carousel-dots{display:flex;justify-content:center;gap:6px;padding:8px 0}
+.carousel-dot{width:8px;height:8px;border-radius:50%;background:#ccc;cursor:pointer;transition:background .2s}
+.carousel-dot.active{background:var(--blue)}
+
 </style>
 </head>
 <body>
@@ -844,9 +853,75 @@ async function handlePdfFile(e) {
   if (!files.length) return;
   $('uploadText').textContent = files.length > 1 ? `已选择 ${files.length} 个PDF` : `已选择: ${files[0].name}`;
   $('uploadText').style.color = 'var(--blue)';
+  $('results').innerHTML = '';
+  $('emptyState').classList.add('hidden');
+  
   for (let i = 0; i < files.length; i++) {
-    await processPdf(files[i], i + 1, files.length);
+    try {
+      await processPdf(files[i], i + 1, files.length);
+    } catch (e) {
+      console.error('PDF', i+1, 'error:', e);
+      showToast(`${files[i].name.substring(0,20)} 处理失败`);
+    }
   }
+  
+  // If multiple results, wrap in carousel
+  const cards = $('results').querySelectorAll('.result-card');
+  if (cards.length > 1) {
+    // Extract all cards
+    const html = $('results').innerHTML;
+    // Find individual cards (they're direct children or in wrappers)
+    const allCards = $('results').querySelectorAll(':scope > .result-card, :scope > div > .result-card');
+    const count = allCards.length;
+    
+    // Build carousel
+    let carHtml = `<div class="carousel-container">
+      <div class="carousel-track" id="carouselTrack">`;
+    
+    // Group cards by source divs (each processPdf call may add a source + cards)
+    const groups = [];
+    let currentGroup = [];
+    for (const node of $('results').children) {
+      if (node.classList.contains('result-card')) {
+        currentGroup.push(node.outerHTML);
+      } else {
+        if (currentGroup.length) { groups.push(currentGroup.join('')); currentGroup = []; }
+        // Include source text div
+        if (node.tagName === 'DIV' && !node.classList.contains('carousel-container')) {
+          currentGroup.push(node.outerHTML);
+        }
+      }
+    }
+    if (currentGroup.length) groups.push(currentGroup.join(''));
+    
+    // Build slides
+    let slidesHtml = '';
+    let dotsHtml = '';
+    for (let i = 0; i < groups.length; i++) {
+      slidesHtml += `<div class="carousel-slide">${groups[i]}</div>`;
+      dotsHtml += `<span class="carousel-dot${i === 0 ? ' active' : ''}" onclick="document.getElementById('carouselTrack').scrollTo({left:document.querySelector('.carousel-slide').offsetWidth*${i},behavior:'smooth'})"></span>`;
+    }
+    
+    $('results').innerHTML = slidesHtml + 
+      `<div class="carousel-dots">${dotsHtml}</div>
+      <div style="text-align:center;padding:4px">
+        <button onclick="this.closest('.result-card') && (this.closest('.result-card').style.display='none'); Array.from(document.querySelectorAll('.result-card')).forEach((c,i)=>{c.style.display='';c.style.animation='fadeIn .3s ease';c.style.margin='0 0 12px 0';c.style.width='auto';}); this.remove(); document.querySelector('.carousel-dots')&&document.querySelector('.carousel-dots').remove();" 
+          style="background:none;border:1px solid var(--blue);color:var(--blue);padding:4px 16px;border-radius:14px;font-size:12px;cursor:pointer;font-family:inherit">列表视图</button>
+      </div>`;
+    
+    // Scroll snap listener for dots
+    setTimeout(() => {
+      const track = $('carouselTrack');
+      if (track) {
+        track.addEventListener('scroll', () => {
+          const slideW = track.querySelector('.carousel-slide').offsetWidth;
+          const idx = Math.round(track.scrollLeft / slideW);
+          document.querySelectorAll('.carousel-dot').forEach((d,i) => d.classList.toggle('active', i === idx));
+        });
+      }
+    }, 100);
+  }
+  
   $('pdfInput').value = '';
   $('uploadText').textContent = '点击或拖拽上传PDF';
   $('uploadText').style.color = '';
