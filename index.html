@@ -877,16 +877,6 @@ async function handlePdfFile(e) {
   // If multiple results, wrap in carousel
   const cards = $('results').querySelectorAll('.result-card');
   if (cards.length > 1) {
-    // Extract all cards
-    const html = $('results').innerHTML;
-    // Find individual cards (they're direct children or in wrappers)
-    const allCards = $('results').querySelectorAll(':scope > .result-card, :scope > div > .result-card');
-    const count = allCards.length;
-    
-    // Build carousel
-    let carHtml = `<div class="carousel-container">
-      <div class="carousel-track" id="carouselTrack">`;
-    
     // Group cards by source divs (each processPdf call may add a source + cards)
     const groups = [];
     let currentGroup = [];
@@ -911,10 +901,11 @@ async function handlePdfFile(e) {
       dotsHtml += `<span class="carousel-dot${i === 0 ? ' active' : ''}" onclick="document.getElementById('carouselTrack').scrollTo({left:document.querySelector('.carousel-slide').offsetWidth*${i},behavior:'smooth'})"></span>`;
     }
     
-    $('results').innerHTML = slidesHtml + 
-      `<div class="carousel-dots">${dotsHtml}</div>
+    $('results').innerHTML = 
+      `<div class="carousel-track" id="carouselTrack">${slidesHtml}</div>
+      <div class="carousel-dots">${dotsHtml}</div>
       <div style="text-align:center;padding:4px">
-        <button onclick="this.closest('.result-card') && (this.closest('.result-card').style.display='none'); Array.from(document.querySelectorAll('.result-card')).forEach((c,i)=>{c.style.display='';c.style.animation='fadeIn .3s ease';c.style.margin='0 0 12px 0';c.style.width='auto';}); this.remove(); document.querySelector('.carousel-dots')&&document.querySelector('.carousel-dots').remove();" 
+        <button class="list-view-btn" onclick="var t=document.getElementById('carouselTrack');t.style.display='block';t.style.overflow='visible';this.style.display='none';document.querySelector('.carousel-dots').style.display='none';Array.from(t.children).forEach(c=>{c.style.display='block';c.style.padding='0';c.style.marginBottom='12px'})"
           style="background:none;border:1px solid var(--blue);color:var(--blue);padding:4px 16px;border-radius:14px;font-size:12px;cursor:pointer;font-family:inherit">列表视图</button>
       </div>`;
     
