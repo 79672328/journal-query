@@ -550,10 +550,13 @@ function renderCard(m, extraClass = '') {
   return h;
 }
 
-function showResults(matches, source = '', unknownJournal = null) {
+function showResults(matches, source = '', unknownJournal = null, append = false) {
   const el = $('results');
-  el.innerHTML = '';
-  
+
+  // In append mode (multi-PDF), skip if no results to avoid noise
+  if (append && !matches.length && !unknownJournal) return;
+  if (!append) el.innerHTML = '';
+
   // Case: no matches in database, but we identified a journal via CrossRef
   if (!matches.length && unknownJournal) {
     $('emptyState').classList.add('hidden');
@@ -638,10 +641,10 @@ function showResults(matches, source = '', unknownJournal = null) {
     frag.appendChild(hiddenWrap);
   }
   
-  el.innerHTML = '';
+  if (!append) el.innerHTML = '';
   el.appendChild(frag);
-  // Auto-scroll to results
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Auto-scroll to results (only on first render)
+  if (!append) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ==================== Event Handlers ====================
@@ -850,38 +853,45 @@ async function processPdf(file, idx = 1, total = 1) {
     return;
   }
   
-  $('loadingMsg').textContent = file.size > 20*1024*1024 ? '解析大型PDF中，可能需要几秒...' : '解析PDF中...';
-  showLoading($('loadingMsg').textContent);
+  const appendMode = idx > 1;
+  const label = total > 1 ? ` (${idx}/${total})` : '';
+  const sizeMsg = file.size > 30*1024*1024 ? '大型PDF解析中...' : '解析PDF中...';
+  $('loadingMsg').textContent = `${sizeMsg}${label}`;
+  $('loading').classList.remove('hidden');
+  $('emptyState').classList.add('hidden');
+  if (!appendMode) $('results').innerHTML = '';
+  
   await loadPdfJs();
   if (!pdfJsLoaded) {
-    showToast('PDF解析库加载失败，请用期刊名或DOI查询');
     hideLoading();
+    showToast('PDF解析库加载失败，请用期刊名或DOI查询');
     return;
   }
-  hideLoading();
   
-  showLoading('解析PDF中...');
   const info = await parsePdf(file);
   hideLoading();
   
   if (!info || (!info.journal && !info.doi && !info.issn)) {
-    $('results').innerHTML = `<div class="result-card" style="border-left:3px solid #1a73e8">
-      <div style="display:flex;align-items:flex-start;gap:10px">
-        <div style="font-size:24px;flex-shrink:0">📋</div>
-        <div>
-          <div style="font-size:15px;font-weight:600;margin-bottom:6px">此PDF未包含期刊元数据</div>
-          <div style="font-size:13px;color:var(--sub);line-height:1.6">
-            这个PDF可能是自己导出的投稿稿，缺少出版商附带的隐藏信息。<br><br>
-            <span style="font-weight:500;color:var(--text)">试试以下方式：</span><br>
-            &nbsp;1.&nbsp; 切换到「<span style="color:var(--blue);font-weight:500">期刊名</span>」模式，直接输入期刊名称<br>
-            &nbsp;2.&nbsp; 切换到「<span style="color:var(--blue);font-weight:500">DOI</span>」模式，粘贴论文的DOI号<br>
-            &nbsp;3.&nbsp; 如果用出版社发给你的原始PDF上传，通常可以直接识别<br>
-            &nbsp;4.&nbsp; 或使用「<span style="color:var(--blue);font-weight:500">批量</span>」模式一次查多个期刊
+    if (appendMode) {
+      showToast(`${file.name.substring(0,30)} 无元数据`);
+    } else {
+      $('results').innerHTML = `<div class="result-card" style="border-left:3px solid #1a73e8">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="font-size:24px;flex-shrink:0">📋</div>
+          <div>
+            <div style="font-size:15px;font-weight:600;margin-bottom:6px">此PDF未包含期刊元数据</div>
+            <div style="font-size:13px;color:var(--sub);line-height:1.6">
+              这个PDF可能是自己导出的投稿稿，缺少出版商附带的隐藏信息。<br><br>
+              <span style="font-weight:500;color:var(--text)">试试以下方式：</span><br>
+              &nbsp;1.&nbsp; 切换到「<span style="color:var(--blue);font-weight:500">期刊名</span>」模式，直接输入期刊名称<br>
+              &nbsp;2.&nbsp; 切换到「<span style="color:var(--blue);font-weight:500">DOI</span>」模式，粘贴论文的DOI号<br>
+              &nbsp;3.&nbsp; 如果用出版社发给你的原始PDF上传，通常可以直接识别<br>
+              &nbsp;4.&nbsp; 或使用「<span style="color:var(--blue);font-weight:500">批量</span>」模式一次查多个期刊
+            </div>
           </div>
         </div>
-      </div>
-    </div>`;
-    $('emptyState').classList.add('hidden');
+      </div>`;
+    }
     return;
   }
   
@@ -891,21 +901,30 @@ async function processPdf(file, idx = 1, total = 1) {
   // Try DOI first
   if (info.doi) {
     source = `DOI: ${esc(info.doi)} `;
-    showLoading('通过DOI查询期刊信息...');
+    if (!appendMode) {
+      $('loadingMsg').textContent = `通过DOI查询期刊信息...${label}`;
+      $('loading').classList.remove('hidden');
+    }
     const crossrefInfo = await lookupDoi(info.doi);
     hideLoading();
     if (crossrefInfo && crossrefInfo.journal) {
       source += `→ ${esc(crossrefInfo.journal)}`;
-      // Exact match first
-      const exact = searchJournalsExact(crossrefInfo.journal);
-      if (exact) { matches = [exact]; }
-      // Fallback: broad search
+      // ISSN match first (most reliable)
+      if (crossrefInfo.issn) {
+        const cleanIssn = crossrefInfo.issn.replace(/-/g, '');
+        const exact = STATE.journals.find(j => (j[1] || '').replace(/-/g, '') === cleanIssn);
+        if (exact) matches = [exact];
+      }
+      if (!matches.length) {
+        const exact = searchJournalsExact(crossrefInfo.journal);
+        if (exact) matches = [exact];
+      }
       if (!matches.length) matches = searchJournals(crossrefInfo.journal);
       if (!matches.length && crossrefInfo.issn) {
         matches = searchJournals(crossrefInfo.issn);
       }
       if (!matches.length) {
-        showResults([], source, crossrefInfo);
+        showResults([], source, crossrefInfo, appendMode);
         return;
       }
     }
@@ -916,10 +935,7 @@ async function processPdf(file, idx = 1, total = 1) {
     source = `PDF提取: ${esc(info.journal)}`;
     matches = searchJournals(info.journal);
     if (!matches.length) {
-      showResults([], source, { journal: info.journal, title: info.title, doi: info.doi });
-      $('pdfInput').value = '';
-      $('uploadText').textContent = '点击或拖拽上传PDF';
-      $('uploadText').style.color = '';
+      showResults([], source, { journal: info.journal, title: info.title, doi: info.doi }, appendMode);
       return;
     }
   }
@@ -930,16 +946,12 @@ async function processPdf(file, idx = 1, total = 1) {
   }
   
   if (!matches.length) {
-    showResults([], source, info);
-    $('pdfInput').value = '';
-    $('uploadText').textContent = '点击或拖拽上传PDF';
-    $('uploadText').style.color = '';
+    showResults([], source, info, appendMode);
     return;
   }
   
   if (info.title) source += `<br>${esc(info.title)}`;
-  
-  showResults(matches, source);
+  showResults(matches, source, false, appendMode);
 }
 
 // ==================== UI Helpers ====================
