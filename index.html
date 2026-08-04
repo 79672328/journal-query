@@ -160,6 +160,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
         <div class="text" id="uploadText">点击或拖拽上传PDF</div>
         <div class="hint">自动提取期刊信息，支持80MB内PDF，可多选</div>
       </div>
+      <div id="wxUpload" style="display:none;margin-top:10px">
+        <div style="text-align:center;font-size:11px;color:#999;margin-bottom:8px">— 微信用户推荐 —</div>
+        <button id="wxUploadBtn" style="display:block;width:100%;padding:14px;background:linear-gradient(135deg,#07c160,#06ad56);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 12px rgba(7,193,96,.3)">
+          从微信聊天记录选择PDF
+        </button>
+        <div style="text-align:center;font-size:11px;color:#aaa;margin-top:6px">iOS用户请使用上方「点击上传」</div>
+      </div>
       <input type="file" id="pdfInput" accept=".pdf" multiple class="hidden">
     </div>
   </div>
@@ -1050,6 +1057,15 @@ document.addEventListener('keydown', e => {
 
 // ==================== Init ====================
 loadData();
+
+// WeChat detection
+if (/MicroMessenger/i.test(navigator.userAgent)) {
+  document.body.classList.add('is-wx');
+  const wxDiv = $('wxUpload');
+  if (wxDiv) wxDiv.style.display = 'block';
+  const wxBtn = $('wxUploadBtn');
+  if (wxBtn) wxBtn.addEventListener('click', () => $('pdfInput').click());
+}
 
 // Register service worker
 if ('serviceWorker' in navigator) {
