@@ -246,7 +246,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 
   <!-- Data status -->
   <div class="stats" id="stats"></div>
-  <div class="stats" style="padding-top:0;color:#bbb">v20 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
+  <div class="stats" style="padding-top:0;color:#bbb">v21 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -616,6 +616,14 @@ const EI_TYPE_LABEL = { 'Journal': '期刊', 'Book-Series': '丛书 / 会议录�
 const EI_CN_LANG = ['中文刊', '英文刊', '中英双语'];
 const EI_STATUS_LABEL = ['保持收录', '同年新收录', '新收录'];
 
+// Elsevier 源表 Country/Region 字段里属于中国的取值 → 规范中文表述。
+// 港澳台一律按「中国香港 / 中国澳门 / 中国台湾」呈现，不作为独立国家或地区。
+// 源表把它们与 China 平级单列，是出版地统计口径，不改变主权归属。
+const EI_REGION_CN = {
+  'china': '中国', 'hong kong': '中国香港',
+  'macao': '中国澳门', 'macau': '中国澳门', 'taiwan': '中国台湾'
+};
+
 // ISSN 归一：8 位无连字符大写，否则视为无效
 function eiIssnKey(s) {
   const k = String(s || '').toUpperCase().replace(/[^0-9X]/g, '');
@@ -633,7 +641,10 @@ function fmtIssn(k) {
 function issnQuery(s) {
   const d = String(s || '').replace(/[^0-9Xx]/g, '').toUpperCase();
   if (d.length < 4 || d.length > 8) return '';
-  return /^\d{4,7}X?$/.test(d) ? d : '';
+  // 合法形态只有两种：4~8 位全数字（含只输前几位的模糊搜），或 4~7 位数字 + 末位校验位 X。
+  // 不能写成 /^\d{4,7}X?$/：\d{4,7} 最多只吃 7 位，8 位纯数字整体过不了正则，
+  // 结果 390 本中文刊里只有 48 本「末位恰为 X」的能搜到，其余 342 本按 ISSN 搜全是空结果。
+  return (/^\d{4,8}$/.test(d) || /^\d{4,7}X$/.test(d)) ? d : '';
 }
 
 // 刊名归一化：忽略大小写、空格与标点，& 与 and 互认；保留中日韩汉字不丢，
@@ -688,8 +699,30 @@ async function loadEiData() {
       if (discKeys[i] && !discByKey.has(discKeys[i])) discByKey.set(discKeys[i], i);
     });
 
+    // 国内办刊的第二个著录来源：SERIALS 主表里 Country/Region 属中国的条目。
+    // 中文刊专表只有 390 种，且是「Elsevier 认定的中国期刊」这一口径；
+    // 主表另有 363 条中国 + 26 条台湾 + 8 条香港。其中 361/363 条中国条目
+    // 其实是专表中文刊的罗马字著录（如「Cailiao Daobao/Materials Reports」= 材料导报），
+    // 按 ISSN 对齐即可判重；真正新增的是中国香港 8 条、中国台湾 26 条、中国 2 条。
+    // 这些刊原先在中文收录页的 EI 库里完全搜不到，只能回期刊名模式。
+    const cnIssnSet = new Set();
+    cn.forEach(r => { if (r[3]) cnIssnSet.add(r[3]); if (r[4]) cnIssnSet.add(r[4]); });
+    const extra = [], extraRegion = [], extraKeys = [];
+    serials.forEach(r => {
+      const region = EI_REGION_CN[String(r[5] || '').trim().toLowerCase()];
+      if (!region) return;
+      if ((r[2] && cnIssnSet.has(r[2])) || (r[3] && cnIssnSet.has(r[3]))) return;
+      extra.push(r); extraRegion.push(region); extraKeys.push([eiKey(r[0])].filter(Boolean));
+    });
+    // 用对象引用区分「专表行」与「主表补充行」：两者字段位置不同
+    // （专表 ISSN 在 [3]/[4]，主表在 [2]/[3]），渲染与过滤都必须先分流，否则会读错字段。
+    const extraSet = new Set(extra);
+    const extraRegionMap = new Map(extra.map((r, i) => [r, extraRegion[i]]));
+
     STATE.ei = {
       serials, cn, disc, keys, cnKeys, discKeys,
+      extra, extraRegion, extraKeys, extraSet, extraRegionMap,
+      cnEnTotal: cn.filter(r => !r[0]).length,
       subj: d.subj || [], langs: d.lang || [],
       byIssn, byKey, cnByIssn, cnByKey, discByIssn, discByKey,
       total: d.total || serials.length,
@@ -718,8 +751,12 @@ function updateZhStat() {
   if (note) { note.textContent = ''; note.style.display = 'none'; }
   if (STATE.cnLib === 'ei') {
     stat.textContent = ei
-      ? `${ei.src}(${ei.version}) · 中文刊 ${ei.cnTotal} 种 · 另收录连续出版物 ${ei.total.toLocaleString()} 种 / 已停收 ${ei.discTotal} 种`
+      ? `${ei.src}(${ei.version}) · 国内刊专表 ${ei.cnTotal} 种（中文刊 ${ei.cnTotal - ei.cnEnTotal} · 国内办英文刊 ${ei.cnEnTotal}）${ei.extra.length ? ` · 另补中国（含港澳台）出版刊 ${ei.extra.length} 种` : ''} · 连续出版物 ${ei.total.toLocaleString()} 种 / 已停收 ${ei.discTotal} 种`
       : 'EI 数据加载中…';
+    if (note && ei) {
+      note.textContent = '说明：本库有两个著录来源 —— Elsevier 中文刊专表（390 种，含中文刊与国内办英文刊，带收录状况），以及 SERIALS 主表中标注中国（含港澳台）出版的刊（仅书目数据，无收录状况）。港澳台按中国表述。国内单位主办、海外出版社出版的英文刊（如 IJSSD）不在专表内，请改用「期刊名」模式查询。';
+      note.style.display = 'block';
+    }
   } else if (STATE.cnLib === 'cscd') {
     stat.textContent = cd
       ? `${cd.src}(${cd.version}) · 共 ${cd.total} 种（核心库 ${cd.coreTotal} + 扩展库 ${cd.extTotal}） · 中文刊 ${cd.cnTotal} / 英文刊 ${cd.enTotal}`
@@ -1844,7 +1881,9 @@ function eiCardBlock(lk, name) {
     </div>`;
 }
 
-// 中文收录页 · EI 库搜索（中文名 / 英文译名 / 罗马字 / ISSN 都能查）
+// 中文收录页 · EI 库搜索
+// 搜索范围 = 中文刊专表（390 种：中文名 / 罗马字 / 英文译名 / ISSN）
+//          + SERIALS 主表里属中国的补充条目（extra，港澳台英文刊等）
 function searchEiCnJournals(query, limit = 40) {
   const ei = STATE.ei;
   if (!ei || !query) return [];
@@ -1852,21 +1891,56 @@ function searchEiCnJournals(query, limit = 40) {
   const issn = issnQuery(query);
   if (!q && !issn) return [];
   const starts = [], contains = [];
-  for (let i = 0; i < ei.cn.length; i++) {
-    const r = ei.cn[i];
-    let bucket = null;
-    if (q) {
-      for (const k of ei.cnKeys[i]) {
-        const p = k.indexOf(q);
-        if (p === 0) { bucket = starts; break; }
-        if (p > 0) bucket = contains;
+  // pi/oi = 该来源里 PRINT / ONLINE ISSN 的下标：专表 [3]/[4]，主表 [2]/[3]
+  const scan = (rows, keyList, pi, oi) => {
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      let bucket = null;
+      if (q) {
+        for (const k of keyList[i]) {
+          const p = k.indexOf(q);
+          if (p === 0) { bucket = starts; break; }
+          if (p > 0) bucket = contains;
+        }
       }
+      // 源表 ISSN 存的是 8 位无连字符大写形式，故前缀比对直接用归一后的查询串
+      if (!bucket && issn && ((r[pi] && r[pi].indexOf(issn) === 0) || (r[oi] && r[oi].indexOf(issn) === 0))) bucket = starts;
+      if (bucket) bucket.push(r);
     }
-    // 源表 ISSN 存的是 8 位无连字符大写形式，故前缀比对直接用归一后的查询串
-    if (!bucket && issn && ((r[3] && r[3].indexOf(issn) === 0) || (r[4] && r[4].indexOf(issn) === 0))) bucket = starts;
-    if (bucket) bucket.push(r);
-  }
+  };
+  scan(ei.cn, ei.cnKeys, 3, 4);
+  scan(ei.extra, ei.extraKeys, 2, 3);
   return starts.concat(contains).slice(0, limit);
+}
+
+// 中文收录页 · EI 库「主表补充条目」卡片（国内办刊中不在中文刊专表的那些）
+// 主表行 = [刊名, 类型, PRINT ISSN, ONLINE ISSN, 出版社, 国家/地区, 语种下标, [学科下标]]
+// 主表不提供「保持 / 新收录」字段，故只陈述收录事实与书目著录，不臆造收录状况。
+function renderEiSerialCard(m, extraClass = '') {
+  const ei = STATE.ei;
+  const title = m[0] || '';
+  const type = EI_TYPE_LABEL[m[1]] || m[1] || '出版物';
+  const p = m[2], o = m[3];
+  const region = (ei && ei.extraRegionMap.get(m)) || '';
+  const issns = [p ? 'ISSN ' + fmtIssn(p) : '', o ? 'eISSN ' + fmtIssn(o) : ''].filter(Boolean).join(' · ');
+  const subj = eiSubjText(m[7], 5);
+
+  return `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
+    <div class="result-title">${esc(title)}<span class="badge-ei" style="font-size:10px;padding:2px 6px;margin-left:4px">EI</span>${region
+      ? `<span class="badge-ei-new" style="font-size:10px;padding:2px 6px;margin-left:4px">${esc(region)}出版</span>` : ''}</div>
+    <div style="font-size:12px;color:var(--sub);margin:2px 0 4px">${esc(type)}${m[4] ? ' · ' + esc(m[4]) : ''}</div>
+    <div class="result-issn">${esc(issns) || '<span style="color:#bbb">源表未给出 ISSN</span>'}</div>
+    <div class="result-grid">
+      <div class="result-item full">
+        <div class="label">Ei 收录状况</div>
+        <div class="value" style="font-size:15px;color:#8a6512">✅ EI ${esc(ei ? ei.version : '')} 收录（SERIALS 主表）</div>
+      </div>${subj ? `<div class="result-item full">
+        <div class="label" style="margin-bottom:2px">EI 学科</div>
+        <div class="value" style="font-size:12px;font-weight:400;color:var(--sub)">${esc(subj)}</div>
+      </div>` : ''}
+    </div>
+    <div class="cn-tip ei">✅ 该刊见于 Elsevier 源表 SERIALS 主表${region ? `，出版地著录为${esc(region)}` : ''} · 未单列于中文刊专表，故无「保持 / 新收录」标注，书目与收录状态均以源表为准</div>
+  </div>`;
 }
 
 // EI 中文刊专表行 = [中文刊名, 罗马字, 英文译名, PRINT ISSN, ONLINE ISSN, 语种, 收录状况, [学科下标]]
@@ -1906,10 +1980,14 @@ function renderEiCard(m, extraClass = '') {
 }
 
 // 中文收录页 · EI 按学科浏览（学科取自主表回填，一本刊可属多个 EI 学科）
+// status = 0 保持收录 / 1 新收录（均取自中文刊专表）；status = 'extra' 取主表补充条目
+// （国内办刊中不在专表的那些，如中国香港、中国台湾的英文刊），单独成组。
 function showEiSubj(si, status, head) {
   const ei = STATE.ei;
   if (!ei) return;
-  const list = ei.cn.filter(r => r[6] === status && (r[7] || []).indexOf(si) >= 0);
+  const list = status === 'extra'
+    ? ei.extra.filter(r => (r[7] || []).indexOf(si) >= 0)
+    : ei.cn.filter(r => r[6] === status && (r[7] || []).indexOf(si) >= 0);
   const nm = ei.subj[si] || '';
   const source = `📚 <b>${esc(nm)}</b> · 共 ${list.length} 种<br><span style="color:#aaa">${esc(head)} · EI ${esc(ei.version)} · 一本刊可属多个 EI 学科</span>`;
   $('cnBrowseArea').classList.add('hidden');
@@ -2235,7 +2313,10 @@ function showCnResults(list, source = '', query = '', append = false) {
   const isCs = STATE.cnLib === 'cs';
   const isCscd = STATE.cnLib === 'cscd';
   const isEi = STATE.cnLib === 'ei';
-  const cardFn = isEi ? renderEiCard : (isCscd ? renderCscdCard : (isCs ? renderCsCard : renderCnCard));
+  // EI 库混有两种行结构（专表行 / 主表补充行），必须按对象引用分流再渲染
+  const cardFn = isEi
+    ? (m, cls) => (STATE.ei && STATE.ei.extraSet.has(m) ? renderEiSerialCard(m, cls) : renderEiCard(m, cls))
+    : (isCscd ? renderCscdCard : (isCs ? renderCsCard : renderCnCard));
   const accent = isEi ? '#9a6b12' : (isCscd ? '#1e6f5c' : (isCs ? '#1a5c9e' : '#c0392b'));
   if (!append) el.innerHTML = '';
   $('emptyState').classList.add('hidden');
@@ -2245,7 +2326,8 @@ function showCnResults(list, source = '', query = '', append = false) {
     if (isEi) {
       const ei = STATE.ei;
       const tot = ei ? `${ei.cnTotal} 种` : '390 种';
-      el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到「${esc(query)}」<br>EI(2026-05-01) 中文刊专表共 ${tot}<br><span style="font-size:12px;color:#aaa">可输入中文刊名、英文译名或 ISSN，如"硅酸盐""Tunnel"</span></div></div>`;
+      const ex = (ei && ei.extra.length) ? `，另含中国（含港澳台）出版刊 ${ei.extra.length} 种` : '';
+      el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到「${esc(query)}」<br>EI(2026-05-01) 国内刊专表共 ${tot}${ex}<br><span style="font-size:12px;color:#aaa">可输入中文刊名、英文刊名或 ISSN，如"硅酸盐""BMEMat"</span><br><span style="font-size:12px;color:#aaa">国内单位主办、海外出版社出版的英文刊（如 IJSSD），请改用上方"期刊名"模式查询</span></div></div>`;
     } else if (isCscd) {
       const cd = STATE.cscd;
       const tot = cd ? `${cd.total} 种（核心库 ${cd.coreTotal} + 扩展库 ${cd.extTotal}）` : '1501 种';
@@ -2300,15 +2382,22 @@ function showCnSuggestions(list) {
   const el = $('cnSuggestions');
   if (!list.length) { el.classList.remove('show'); el.innerHTML = ''; return; }
   if (STATE.cnLib === 'ei') {
+    const ei = STATE.ei;
     el.innerHTML = list.map((j, i) => {
-      const title = j[0] || j[2] || j[1] || '';
+      const isEx = !!(ei && ei.extraSet.has(j));
+      // 主表补充行字段位置与专表不同（[0] 刊名、[6] 是语种下标而非收录状况），
+      // 不分流就会把语种下标 1 误读成「2026 新收录」。
+      const title = isEx ? (j[0] || '') : (j[0] || j[2] || j[1] || '');
       const sub = eiSubjText(j[7], 2);
-      const badge = j[6] === 1
+      const meta = isEx
+        ? `${esc((ei.extraRegionMap.get(j) || '') + '出版')}${sub ? ' · ' + esc(sub) : ''}`
+        : `${esc(EI_CN_LANG[j[5]] || '')}${sub ? ' · ' + esc(sub) : ''}`;
+      const badge = (!isEx && j[6] === 1)
         ? '<span class="badge-ei-new">2026 新收录</span>'
         : '<span class="badge-ei">EI 收录</span>';
       return `<div class="sug-item" data-idx="${i}">
         <div class="sug-name">${esc(title)}</div>
-        <div class="sug-meta">${badge}<span style="color:#888;font-size:11px">${esc(EI_CN_LANG[j[5]] || '')}${sub ? ' · ' + esc(sub) : ''}</span></div>
+        <div class="sug-meta">${badge}<span style="color:#888;font-size:11px">${meta}</span></div>
       </div>`;
     }).join('');
   } else if (STATE.cnLib === 'cscd') {
@@ -2361,13 +2450,12 @@ function renderCnBrowse() {
     const ei = STATE.ei;
     if (!ei) { area.innerHTML = '<div class="cn-disc-item" style="cursor:default;color:#999">数据加载中…</div>'; return; }
     // 一本刊可同时属多个 EI 学科，故各学科条目数之和会大于该组总刊数（组头标的才是总刊数）
-    const grp = (title, status) => {
+    const grp = (title, status, rows) => {
       const cnt = new Array(ei.subj.length).fill(0);
       let total = 0;
-      ei.cn.forEach(r => {
-        if (r[6] !== status) return;
+      rows.forEach(r => {
         total++;
-        (r[7] || []).forEach(si => { cnt[si]++; });
+        (r[7] || []).forEach(si => { if (si < cnt.length) cnt[si]++; });
       });
       let inner = '';
       cnt.forEach((n, si) => {
@@ -2378,8 +2466,9 @@ function renderCnBrowse() {
       });
       if (inner) h += `<div class="cn-disc-head ei">${esc(title)}（${total} 种）</div>` + inner;
     };
-    grp('EI 保持收录', 0);
-    grp('EI 2026 年新收录', 1);
+    grp('EI 保持收录 · 中文刊专表', 0, ei.cn.filter(r => r[6] === 0));
+    grp('EI 2026 年新收录 · 中文刊专表', 1, ei.cn.filter(r => r[6] === 1));
+    if (ei.extra.length) grp('国内办刊（含港澳台）· SERIALS 主表', 'extra', ei.extra);
   } else if (STATE.cnLib === 'cscd') {
     const cd = STATE.cscd;
     if (!cd) { area.innerHTML = '<div class="cn-disc-item" style="cursor:default;color:#999">数据加载中…</div>'; return; }
@@ -2615,7 +2704,7 @@ $$('#libSwitch button').forEach(btn => {
     $('emptyState').classList.remove('hidden');
     const inp = $('cnInput');
     inp.placeholder = STATE.cnLib === 'ei'
-      ? '输入中文刊名 / 英文译名，如：硅酸盐学报、Tunnel'
+      ? '输入中文刊名 / 英文刊名 / ISSN，如：硅酸盐学报、BMEMat'
       : (STATE.cnLib === 'cscd'
         ? '输入中文 / 英文期刊名，如：岩土工程学报'
         : (STATE.cnLib === 'cs'
@@ -2676,7 +2765,7 @@ $('cnInput').addEventListener('keydown', function(e) {
     if (!zhLibReady()) { showToast('中文收录数据加载中，请稍候'); return; }
     const res = zhSearch(q, 200);
     const head = STATE.cnLib === 'ei'
-      ? `🔍 <b>${esc(q)}</b> · EI 中文刊 ${esc(STATE.ei ? STATE.ei.version : '')}`
+      ? `🔍 <b>${esc(q)}</b> · EI 国内刊 ${esc(STATE.ei ? STATE.ei.version : '')}`
       : (STATE.cnLib === 'cscd'
         ? `🔍 <b>${esc(q)}</b> · CSCD ${esc(STATE.cscd ? STATE.cscd.version : '')}`
         : (STATE.cnLib === 'cs'
@@ -2711,7 +2800,10 @@ $('cnBrowseArea').addEventListener('click', e => {
   const item = e.target.closest('.cn-disc-item');
   if (!item) return;
   if (item.dataset.eisubj !== undefined) {
-    showEiSubj(parseInt(item.dataset.eisubj, 10), parseInt(item.dataset.eistatus, 10), item.dataset.eihead || '');
+    // 收录状况取值 0/1；第三组（主表补充条目）用 'extra' 标记，没有收录状况字段。
+    // 若直接 parseInt('extra') 会得到 NaN，学科结果静默为空。
+    const st = item.dataset.eistatus;
+    showEiSubj(parseInt(item.dataset.eisubj, 10), st === 'extra' ? 'extra' : parseInt(st, 10), item.dataset.eihead || '');
     return;
   }
   if (item.dataset.cscdcls !== undefined) {
@@ -2896,7 +2988,7 @@ async function processPdf(file, idx = 1, total = 1) {
             <div style="font-size:15px;font-weight:600;margin-bottom:6px">没能确认这篇 PDF 的刊名</div>
             <div style="font-size:13px;color:var(--sub);line-height:1.6">
               ${readChars
-                ? `已读到 PDF 的文字（页眉页脚共 ${readChars} 字），但没能在北大核心 2023 年版的 1987 种、南大 CSSCI 的 935 种、中科院 CSCD 的 1501 种，以及 EI 中文刊的 390 种名单里找到对应刊名。`
+                ? `已读到 PDF 的文字（页眉页脚共 ${readChars} 字），但没能在北大核心 2023 年版的 1987 种、南大 CSSCI 的 935 种、中科院 CSCD 的 1501 种，以及 EI 的国内刊名录（中文刊专表 390 种，含国内办英文刊）里找到对应刊名。`
                 : `这个 PDF 里没有可提取的文字（多半是扫描件／图片版），页眉页脚读不出内容。`}<br><br>
               <span style="font-weight:500;color:var(--text)">可能的原因：</span><br>
               &nbsp;1.&nbsp; 该刊<span style="font-weight:500">既非北大中文核心，也不属于南大 CSSCI</span>（行业刊、内部刊等）<br>
