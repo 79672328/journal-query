@@ -214,14 +214,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 
   <!-- Data status -->
   <div class="stats" id="stats"></div>
-  <div class="stats" style="padding-top:0;color:#bbb">v15 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
+  <div class="stats" style="padding-top:0;color:#bbb">v16 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
 // ==================== Lazy Load pdf.js ====================
-let pdfJsLoading = false, pdfJsLoaded = false;
+// 三个 CDN 依次回退：cdnjs 在境内经常连不上，jsdelivr / unpkg 相对稳。
+// 主库、worker、CMap 都吃同一个源的路径结构（都在包根目录下）。
+const PDFJS_VER = '3.11.174';
+const PDFJS_BASES = [
+  'https://cdn.jsdelivr.net/npm/pdfjs-dist@' + PDFJS_VER + '/build/',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + PDFJS_VER + '/',
+  'https://unpkg.com/pdfjs-dist@' + PDFJS_VER + '/build/'
+];
+const CMAP_BASES = [
+  'https://cdn.jsdelivr.net/npm/pdfjs-dist@' + PDFJS_VER + '/cmaps/',
+  'https://unpkg.com/pdfjs-dist@' + PDFJS_VER + '/cmaps/'
+];
+let pdfJsLoading = false, pdfJsLoaded = false, pdfJsBase = '';
+
 function loadPdfJs() {
   return new Promise((resolve) => {
     if (pdfJsLoaded) { resolve(); return; }
@@ -230,11 +243,23 @@ function loadPdfJs() {
       return;
     }
     pdfJsLoading = true;
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    s.onload = () => { pdfJsLoaded = true; resolve(); };
-    s.onerror = () => { pdfJsLoading = false; resolve(); };
-    document.head.appendChild(s);
+    let i = 0;
+    const tryNext = () => {
+      if (i >= PDFJS_BASES.length) { pdfJsLoading = false; resolve(); return; }
+      const base = PDFJS_BASES[i++];
+      const s = document.createElement('script');
+      s.src = base + 'pdf.min.js';
+      s.onload = () => {
+        if (!window.pdfjsLib) { tryNext(); return; }   // 拿到了但没挂上（被劫持/空文件）
+        pdfJsLoaded = true;
+        pdfJsBase = base;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js';
+        resolve();
+      };
+      s.onerror = tryNext;
+      document.head.appendChild(s);
+    };
+    tryNext();
   });
 }
 
@@ -569,26 +594,73 @@ async function parsePdf(file) {
   }
   
   try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = (pdfJsBase || PDFJS_BASES[0]) + 'pdf.worker.min.js';
+    }
     const buf = await file.arrayBuffer();
-    // 中文期刊 PDF 的正文常用 GBK-EUC-H 等 CJK 编码嵌入，不提供 CMap 就解不出文字层
-    // （getTextContent() 返回空），中文论文便完全无法识别刊名。
-    // cdnjs 不含 cmaps 资源（403），改用 jsdelivr 上同版本的包。
-    const pdf = await pdfjsLib.getDocument({
-      data: buf,
-      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
-      cMapPacked: true
-    }).promise;
+
+    // 中文期刊的刊名几乎只出现在页眉或页脚。正文里出现的刊名多半是参考文献
+    // （比如引用了《硅酸盐学报》），拿去做判定会误报，所以按坐标把每页顶部 15%、
+    // 底部 13% 的文字单独摘出来，正文全文只留作最后的兜底。
+    // 另外中文期刊 PDF 的正文常用 GBK-EUC-H 等 CJK 编码嵌入，不提供 CMap 时
+    // getTextContent() 直接返回空，中文论文便完全识别不了；但 CMap 要多一次网络
+    // 请求，英文 PDF 不该白等，所以做成「先默认解析、解不出才带 CMap 重试」。
+    const readPageZones = async (doc, n) => {
+      try {
+        const page = await doc.getPage(n);
+        const vp = page.getViewport({ scale: 1 });
+        const tc = await page.getTextContent();
+        const H = vp.height || 1;
+        const head = [], foot = [], all = [];
+        for (const it of tc.items) {
+          const s = it.str;
+          if (!s) continue;
+          all.push(s);
+          const y = it.transform[5];
+          if (y > H * 0.85) head.push(s);
+          else if (y < H * 0.13) foot.push(s);
+        }
+        return { head: head.join(' '), foot: foot.join(' '), all: all.join(' ') };
+      } catch(e) { return { head: '', foot: '', all: '' }; }
+    };
+    // 前 3 页一起取：有的刊首页只印英文名，中文刊名在第 2 页页脚（如《混凝土世界》）。
+    const readHead = async (doc) => {
+      const max = Math.min(3, doc.numPages || 1);
+      const zs = [];
+      for (let p = 1; p <= max; p++) {
+        const z = await readPageZones(doc, p);
+        zs.push(z);
+        if (p === 1 && !z.all) break;   // 第一页就空白 → 多半需要 CMap，先不必白读后面
+      }
+      return zs;
+    };
+    const fresh = () => new Uint8Array(buf.slice(0));   // pdf.js 会接管缓冲区，重试必须给新副本
+
+    let pdf = await pdfjsLib.getDocument({ data: fresh() }).promise;
+    let zones = await readHead(pdf);
+
+    if (!zones.map(z => z.all).join('').trim()) {
+      for (const cu of CMAP_BASES) {
+        try {
+          const doc2 = await Promise.race([
+            pdfjsLib.getDocument({ data: fresh(), cMapUrl: cu, cMapPacked: true }).promise,
+            new Promise((_, rej) => setTimeout(() => rej(new Error('cmap timeout')), 12000))
+          ]);
+          const z2 = await readHead(doc2);
+          if (z2.map(z => z.all).join('').trim()) { pdf = doc2; zones = z2; break; }
+          if (doc2.destroy) doc2.destroy();
+        } catch(e) { /* 这个源不通就换下一个；都不通则沿用无 CMap 的结果 */ }
+      }
+    }
+
+    const firstPageText = (zones[0] && zones[0].all) || '';
+    // 每页的「页眉 页脚」各自成行排在最前，第 1 页全文压到最后作兜底
+    const headText = zones.map(z => (z.head + ' ' + z.foot).trim()).filter(Boolean).join('\n')
+                   + '\n' + firstPageText;
+
+
     const meta = await pdf.getMetadata();
     const info = meta.info || {};
-    
-    // 首页正文：既用于兜底找 DOI，也用于中文核心刊名反向定位
-    let firstPageText = '';
-    try {
-      const page = await pdf.getPage(1);
-      const text = await page.getTextContent();
-      firstPageText = text.items.map(t => t.str).join(' ');
-    } catch(e) { /* 首页文本拿不到不影响主流程 */ }
 
     // Extract DOI from various possible fields
     let doi = info.DOI || info.doi || '';
@@ -622,7 +694,8 @@ async function parsePdf(file) {
       journal: journal,
       issn: info.ISSN || '',
       doi: doi || '',
-      firstPageText: firstPageText
+      firstPageText: firstPageText,
+      headText: headText
     };
   } catch(e) {
     console.error('PDF parse error:', e);
@@ -880,11 +953,9 @@ function cnTitleBadge(cnHit) {
 function cnFindInText(text) {
   const cn = STATE.cn;
   if (!cn || !cn.names || !text) return null;
-  const norm = normalizeCn(text);
-  if (norm.length < 6) return null;
 
   // 只在给定范围内找。requireUnique=true 时要求全范围只有一本刊命中，
-  // 否则说明正文里顺带提了别的刊物，结论不可靠。
+  // 否则说明这段文字里顺带提了别的刊物，结论不可靠。
   const scan = (scope, requireUnique) => {
     let best = null, bestPos = Infinity, bestLen = -1, count = 0;
     const names = cn.names, J = cn.journals;
@@ -906,15 +977,31 @@ function cnFindInText(text) {
     return best;
   };
 
-  // 第一轮：篇首 400 字内取最靠前的——中文期刊刊名一般就在页眉。
-  // 第二轮：仍无果才放开到全文，但必须唯一命中。
-  return scan(norm.slice(0, 400), false) || scan(norm, true);
+  const scanOne = (piece) => {
+    const norm = normalizeCn(piece);
+    if (norm.length < 6) return null;
+    // 第一轮：篇首 400 字内取最靠前的
+    // 第二轮：仍无果才放开到整段，但必须唯一命中
+    return scan(norm.slice(0, 400), false) || scan(norm, true);
+  };
+
+  // 按行分段扫（调用方把每页的「页眉+页脚」各自放一行，末尾接第 1 页全文）。
+  // 逐段来而不是拼在一起，是为了让「靠前那页先说话」：页眉页脚命中就该拍板，
+  // 不能被后面正文里的参考文献把唯一性判据搅黄。
+  const parts = String(text).split('\n');
+  for (const pt of parts) {
+    const hit = scanOne(pt);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 // 正文兜底识别。命中则直接出结果并返回 true；未命中返回 false，交回原流程。
 function cnTextFallback(info, source, appendMode) {
-  if (!info || !info.firstPageText || !STATE.cn) return false;
-  const hit = cnFindInText(info.firstPageText);
+  if (!info || !STATE.cn) return false;
+  const text = info.headText || info.firstPageText || '';
+  if (!text) return false;
+  const hit = cnFindInText(text);
   if (!hit) return false;
   const nm = hit[0];
   const srcX = `PDF正文识别: ${esc(nm)}`;
@@ -1414,26 +1501,56 @@ async function processPdf(file, idx = 1, total = 1) {
   
   const info = await parsePdf(file);
   hideLoading();
-  
-  if (!info || (!info.journal && !info.doi && !info.issn)) {
-    // 中文期刊 PDF 常常既无元数据也无 DOI。先让中文核心库用刊名表在首页正文里反向定位，
-    // 认出来了就正常出结果，不再直接判定「无元数据」。
-    if (info && cnTextFallback(info, '', appendMode)) return;
+
+  // 「解析失败」和「解析出来了但没元数据」是两回事。以前两者共用一句
+  // 「此PDF未包含期刊元数据」，把「根本没读出来」也说成「PDF 没元数据」，
+  // 容易让人以为站点坏了 —— 分开报，才知道该往哪儿查。
+  if (!info) {
     if (appendMode) {
-      showToast(`${file.name.substring(0,30)} 无元数据`);
+      showToast(`${file.name.substring(0,30)} 解析失败`);
     } else {
-      $('results').innerHTML = `<div class="result-card" style="border-left:3px solid #1a73e8">
+      $('results').innerHTML = `<div class="result-card" style="border-left:3px solid #e67e22">
         <div style="display:flex;align-items:flex-start;gap:10px">
-          <div style="font-size:24px;flex-shrink:0">📋</div>
+          <div style="font-size:24px;flex-shrink:0">⚠️</div>
           <div>
-            <div style="font-size:15px;font-weight:600;margin-bottom:6px">此PDF未包含期刊元数据</div>
+            <div style="font-size:15px;font-weight:600;margin-bottom:6px">这个 PDF 没能打开</div>
             <div style="font-size:13px;color:var(--sub);line-height:1.6">
-              这个PDF可能是自己导出的投稿稿，缺少出版商附带的隐藏信息。<br><br>
-              <span style="font-weight:500;color:var(--text)">试试以下方式：</span><br>
-              &nbsp;1.&nbsp; 切换到「<span style="color:var(--blue);font-weight:500">期刊名</span>」模式，直接输入期刊名称<br>
-              &nbsp;2.&nbsp; 切换到「<span style="color:var(--blue);font-weight:500">DOI</span>」模式，粘贴论文的DOI号<br>
-              &nbsp;3.&nbsp; 如果用出版社发给你的原始PDF上传，通常可以直接识别<br>
-              &nbsp;4.&nbsp; 或使用「<span style="color:var(--blue);font-weight:500">批量</span>」模式一次查多个期刊
+              常见原因：文件加密、下载不完整，或解析库没能加载。<br><br>
+              <span style="font-weight:500;color:var(--text)">可以先试：</span><br>
+              &nbsp;1.&nbsp; 刷新页面后重新上传一次<br>
+              &nbsp;2.&nbsp; 换用「<span style="color:var(--blue);font-weight:500">期刊名</span>」或「<span style="color:var(--blue);font-weight:500">DOI</span>」模式查询
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }
+    return;
+  }
+
+  if (!info.journal && !info.doi && !info.issn) {
+    // 中文期刊 PDF 常常既无元数据也无 DOI。先让中文核心库用刊名表在页眉页脚里反向定位，
+    // 认出来了就正常出结果，不再直接判定「无元数据」。
+    if (cnTextFallback(info, '', appendMode)) return;
+    const readChars = String(info.headText || '').trim().length;
+    if (appendMode) {
+      showToast(`${file.name.substring(0,30)} 未识别到刊名`);
+    } else {
+      $('results').innerHTML = `<div class="result-card" style="border-left:3px solid #e67e22">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="font-size:24px;flex-shrink:0">🔍</div>
+          <div>
+            <div style="font-size:15px;font-weight:600;margin-bottom:6px">没能确认这篇 PDF 的刊名</div>
+            <div style="font-size:13px;color:var(--sub);line-height:1.6">
+              ${readChars
+                ? `已读到 PDF 的文字（页眉页脚共 ${readChars} 字），但没能在北大核心 2023 年版的 1987 种名单里找到对应刊名。`
+                : `这个 PDF 里没有可提取的文字（多半是扫描件／图片版），页眉页脚读不出内容。`}<br><br>
+              <span style="font-weight:500;color:var(--text)">可能的原因：</span><br>
+              &nbsp;1.&nbsp; 该刊<span style="font-weight:500">不属于北大中文核心</span>（行业刊、内部刊等）<br>
+              &nbsp;2.&nbsp; 刊名印在扫描图上，PDF 里没有文字层<br>
+              &nbsp;3.&nbsp; 版面特殊，刊名不在页眉或页脚<br><br>
+              <span style="font-weight:500;color:var(--text)">建议：</span><br>
+              &nbsp;·&nbsp; 切到「<span style="color:var(--blue);font-weight:500">期刊名</span>」模式直接输入刊名，立刻就能确认是否属于北大核心<br>
+              &nbsp;·&nbsp; 有 DOI 的话用「<span style="color:var(--blue);font-weight:500">DOI</span>」模式
             </div>
           </div>
         </div>

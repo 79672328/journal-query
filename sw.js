@@ -1,6 +1,6 @@
 // Service Worker — network-first for code, cache-first for assets
 // Bumping VERSION forces cache refresh on next page load
-const VERSION = '15';
+const VERSION = '16';
 const CACHE = 'jq-v1.' + VERSION;
 
 // Static assets that never change between deploys (cached)
@@ -57,7 +57,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   // CDN resources: stale-while-revalidate
-  if (url.includes('cdnjs.cloudflare.com') || url.includes('cdn.jsdelivr.net')) {
+  if (url.includes('cdnjs.cloudflare.com') || url.includes('cdn.jsdelivr.net') || url.includes('unpkg.com')) {
     e.respondWith(
       caches.match(e.request).then(cached =>
         cached || fetch(e.request).then(resp => {
