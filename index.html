@@ -129,6 +129,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .badge-cscd-ext{display:inline-block;background:#e6f2ee;color:#1e6f5c;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:500;margin:0 4px 0 0;vertical-align:middle}
 .cn-disc-head.cscd{background:#1e6f5c}
 .cn-tip.cscd{background:#e9f3f0;color:#1e6f5c}
+
+/* ===== EI Compendex ===== */
+.badge-ei{display:inline-block;background:#9a6b12;color:#fff;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:600;margin:0 2px 0 0;vertical-align:middle}
+.badge-ei-new{display:inline-block;background:#fdf3e0;color:#9a6b12;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:500;margin:0 4px 0 0;vertical-align:middle}
+.badge-ei-disc{display:inline-block;background:#f0eee8;color:#7d7154;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:500;margin:0 4px 0 0;vertical-align:middle}
+.cn-disc-head.ei{background:#9a6b12}
+.cn-tip.ei{background:#fdf6e8;color:#8a6512}
+.lib-switch button.active[data-lib="ei"]{border-color:#9a6b12;color:#9a6b12;background:#fdf6e8}
 .lib-switch{display:flex;gap:6px;margin-bottom:8px}
 .lib-switch button{flex:1;padding:7px 4px;font-size:12px;border:1.5px solid var(--border);background:#fff;border-radius:8px;color:var(--sub);cursor:pointer;font-family:inherit;white-space:nowrap}
 .lib-switch button.active{font-weight:600}
@@ -144,7 +152,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     <div class="header-icon">JQ</div>
     <div>
       <h1>新锐期刊分区查询</h1>
-      <div class="sub">影响因子 &middot; 新锐分区 &middot; 北大核心 &middot; 南大核心 CSSCI &middot; 中科院 CSCD &middot; 2026</div>
+      <div class="sub">影响因子 &middot; 新锐分区 &middot; 北大核心 &middot; 南大核心 CSSCI &middot; 中科院 CSCD &middot; EI &middot; 2026</div>
     </div>
   </div>
 
@@ -189,7 +197,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <div class="upload-area" id="uploadArea">
         <div class="icon">📄</div>
         <div class="text" id="uploadText">点击或拖拽上传PDF</div>
-        <div class="hint">自动提取期刊信息，支持80MB内PDF，可多选<br>结果同时给出新锐分区、JCR分区，以及北大核心 / 南大核心 CSSCI / 中科院 CSCD 收录情况</div>
+        <div class="hint">自动提取期刊信息，支持80MB内PDF，可多选<br>结果同时给出新锐分区、JCR分区，以及北大核心 / 南大核心 CSSCI / 中科院 CSCD / EI Compendex 收录情况</div>
       </div>
       <div id="wxUpload" style="display:none;margin-top:10px">
         <div style="text-align:center;font-size:11px;color:#999;margin-bottom:8px">— 微信用户推荐 —</div>
@@ -201,12 +209,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <input type="file" id="pdfInput" accept=".pdf" multiple class="hidden">
     </div>
 
-    <!-- 中文收录（北大核心 + 南大核心 CSSCI + 中科院 CSCD） -->
+    <!-- 中文收录（北大核心 + 南大核心 CSSCI + 中科院 CSCD + EI） -->
     <div id="modeCn" class="hidden">
       <div class="lib-switch" id="libSwitch">
         <button class="active" data-lib="cn">北大核心</button>
         <button data-lib="cs">南大核心 CSSCI</button>
         <button data-lib="cscd">中科院 CSCD</button>
+        <button data-lib="ei">EI 收录</button>
       </div>
       <div class="input-row" style="position:relative">
         <input type="text" id="cnInput" placeholder="输入中文期刊名，如：岩土工程学报" autocomplete="off">
@@ -237,7 +246,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 
   <!-- Data status -->
   <div class="stats" id="stats"></div>
-  <div class="stats" style="padding-top:0;color:#bbb">v19 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
+  <div class="stats" style="padding-top:0;color:#bbb">v20 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -303,7 +312,10 @@ const STATE = {
   // 中科院 CSCD (2025-2026 来源期刊：核心库 + 扩展库，含中文刊与英文刊)
   cscd: null,        // {journals, names, cls, clsCounts, total, coreTotal, extTotal, version, src}
   cscdLoaded: false,
-  cnLib: 'cn'        // 「中文收录」页当前浏览的库: cn | cs | cscd
+  // EI Compendex（Elsevier 源列表 2026-05-01 版：连续出版物 + 中文刊专表 + 停止收录）
+  ei: null,          // {serials, cn, disc, subj, langs, byIssn, byKey, cnByKey, discByKey, ...}
+  eiLoaded: false,
+  cnLib: 'cn'        // 「中文收录」页当前浏览的库: cn | cs | cscd | ei
 };
 
 // ==================== Data Loading ====================
@@ -330,6 +342,8 @@ async function loadData() {
     loadCsData();
     // 中科院 CSCD 库独立加载
     loadCscdData();
+    // EI Compendex（Elsevier 源列表）独立加载
+    loadEiData();
   } catch(e) {
     console.error('Data load error:', e);
     $('stats').textContent = '数据加载失败，请刷新重试';
@@ -589,13 +603,124 @@ async function loadCscdData() {
 }
 
 // 「中文收录」页的库说明行，随当前库切换
+// ==================== EI Compendex 数据加载 ====================
+// 数据来源：Elsevier《Compendex 收录出版物目录》(CPXSourceList) 2026-05-01 版。
+// 三张表：SERIALS（连续出版物 6432）、中文刊专表（390，含 Ei 年度收录状况）、
+//        DISCONTINUED（停止收录 228，含最终收录年/卷/期/页）。
+// 载荷：
+//   serials 行 = [刊名, 类型, ISSN, EISSN, 出版社, 国家/地区, 语言下标, [学科下标]]
+//   cn 行      = [中文刊名, 罗马字刊名, 英文译名, PRINT ISSN, ONLINE ISSN, 语种, 收录状况, [学科下标]]
+//                语种 0=中文 1=英文 2=中英双语；收录状况 0=保持收录 1=新收录
+//   disc 行    = [刊名, ISSN, EISSN, 最终年, 卷, 期, 页码]
+const EI_TYPE_LABEL = { 'Journal': '期刊', 'Book-Series': '丛书 / 会议录系列', 'Trade Journal': '行业刊' };
+const EI_CN_LANG = ['中文刊', '英文刊', '中英双语'];
+const EI_STATUS_LABEL = ['保持收录', '同年新收录', '新收录'];
+
+// ISSN 归一：8 位无连字符大写，否则视为无效
+function eiIssnKey(s) {
+  const k = String(s || '').toUpperCase().replace(/[^0-9X]/g, '');
+  return k.length === 8 ? k : '';
+}
+function fmtIssn(k) {
+  return (k && k.length === 8) ? k.slice(0, 4) + '-' + k.slice(4) : (k || '');
+}
+
+// ISSN 查询串识别（供中文刊专表搜索用，支持只输入前几位做前缀搜）。
+// 判据不能写成「不含字母就是 ISSN」：中国刊号末位是校验位，可以是 X，
+// 如《土木工程学报》1000-131X。旧写法遇到 X 就判「不是 ISSN」，
+// 结果 36 本 PRINT ISSN 或 13 本 ONLINE ISSN 末位为 X 的中文刊全部搜不出来，
+// 页面表现是「搜了个官方刊号却没结果」，属静默失败。
+function issnQuery(s) {
+  const d = String(s || '').replace(/[^0-9Xx]/g, '').toUpperCase();
+  if (d.length < 4 || d.length > 8) return '';
+  return /^\d{4,7}X?$/.test(d) ? d : '';
+}
+
+// 刊名归一化：忽略大小写、空格与标点，& 与 and 互认；保留中日韩汉字不丢，
+// 否则中文刊名会被剥成空串（EI 中文刊专表整表都是中文名）。
+function eiKey(s) {
+  return String(s || '').toLowerCase()
+    .replace(/&amp;/g, ' and ').replace(/&/g, ' and ')
+    .replace(/[^a-z0-9\u4e00-\u9fa5\u3040-\u30ff]+/g, '');
+}
+
+async function loadEiData() {
+  try {
+    const resp = await fetch('ei_data.json');
+    if (!resp.ok) throw new Error('EI data fetch failed: ' + resp.status);
+    const wrap = await resp.json();
+
+    let d;
+    if (wrap.gz) {
+      const b64 = Array.isArray(wrap.gz) ? wrap.gz.join('') : wrap.gz;
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+      d = JSON.parse(await new Response(stream).text());
+    } else {
+      d = wrap;
+    }
+
+    const serials = d.serials || [], cn = d.cn || [], disc = d.disc || [];
+    const keys = serials.map(r => eiKey(r[0]));
+    const byIssn = new Map(), byKey = new Map();
+    serials.forEach((r, i) => {
+      if (r[2] && !byIssn.has(r[2])) byIssn.set(r[2], i);
+      if (r[3] && !byIssn.has(r[3])) byIssn.set(r[3], i);
+      if (keys[i] && !byKey.has(keys[i])) byKey.set(keys[i], i);
+    });
+
+    // 中文刊专表：一本刊有三个可能被查到的名字（中文名 / 罗马字 / 英文译名），都要能命中
+    const cnKeys = cn.map(r => [eiKey(r[0]), eiKey(r[2]), eiKey(r[1])].filter(Boolean));
+    const cnByIssn = new Map(), cnByKey = new Map();
+    cn.forEach((r, i) => {
+      if (r[3] && !cnByIssn.has(r[3])) cnByIssn.set(r[3], i);
+      if (r[4] && !cnByIssn.has(r[4])) cnByIssn.set(r[4], i);
+      cnKeys[i].forEach(k => { if (!cnByKey.has(k)) cnByKey.set(k, i); });
+    });
+
+    const discKeys = disc.map(r => eiKey(r[0]));
+    const discByIssn = new Map(), discByKey = new Map();
+    disc.forEach((r, i) => {
+      if (r[1] && !discByIssn.has(r[1])) discByIssn.set(r[1], i);
+      if (r[2] && !discByIssn.has(r[2])) discByIssn.set(r[2], i);
+      if (discKeys[i] && !discByKey.has(discKeys[i])) discByKey.set(discKeys[i], i);
+    });
+
+    STATE.ei = {
+      serials, cn, disc, keys, cnKeys, discKeys,
+      subj: d.subj || [], langs: d.lang || [],
+      byIssn, byKey, cnByIssn, cnByKey, discByIssn, discByKey,
+      total: d.total || serials.length,
+      cnTotal: d.cnTotal || cn.length,
+      discTotal: d.discTotal || disc.length,
+      subjTotal: (d.subj || []).length,
+      version: d.v, src: d.src
+    };
+    STATE.eiLoaded = true;
+    updateZhStat();
+
+    // 时序保护：与北大 / 南大 / CSCD 同理，晚到时重绘已有结果
+    if (STATE.lastResults && $('results') && $('results').innerHTML.trim()) {
+      showResults(STATE.lastResults.matches, STATE.lastResults.source, STATE.lastResults.unknownJournal, false);
+    }
+  } catch (e) {
+    console.error('EI 数据加载失败', e);
+  }
+}
+
 function updateZhStat() {
   const stat = $('cnStat');
   if (!stat) return;
-  const cn = STATE.cn, cs = STATE.cs, cd = STATE.cscd;
+  const cn = STATE.cn, cs = STATE.cs, cd = STATE.cscd, ei = STATE.ei;
   const note = $('cnNote');
   if (note) { note.textContent = ''; note.style.display = 'none'; }
-  if (STATE.cnLib === 'cscd') {
+  if (STATE.cnLib === 'ei') {
+    stat.textContent = ei
+      ? `${ei.src}(${ei.version}) · 中文刊 ${ei.cnTotal} 种 · 另收录连续出版物 ${ei.total.toLocaleString()} 种 / 已停收 ${ei.discTotal} 种`
+      : 'EI 数据加载中…';
+  } else if (STATE.cnLib === 'cscd') {
     stat.textContent = cd
       ? `${cd.src}(${cd.version}) · 共 ${cd.total} 种（核心库 ${cd.coreTotal} + 扩展库 ${cd.extTotal}） · 中文刊 ${cd.cnTotal} / 英文刊 ${cd.enTotal}`
       : 'CSCD 数据加载中…';
@@ -952,13 +1077,14 @@ function renderCard(m, extraClass = '') {
   const cnHit = findCn(name);          // 中文核心联查（数据未就绪时返回 null）
   const csHit = findCs(name);          // 南大核心联查
   const cdHit = findCscd(name);        // 中科院 CSCD 联查
+  const eiLk = eiLookup(name, issn);   // EI Compendex 联查（ISSN 优先，刊名兜底）
   const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
   const jcrColorClass = jcrQ ? 'badge-' + jcrQ.toLowerCase() : '';
   const wosBadge = wosIdx ? wosIdx.split(' | ').map(i => `<span style="display:inline-block;background:#e8f5e9;color:#2e7d32;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;margin:0 2px">${i}</span>`).join('') : '';
   const wosSubjShort = wosSubj ? wosSubj.split(' | ').slice(0, 3).join(' · ') : '';
   
   let h = `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
-    <div class="result-title">${esc(name)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}</div>
+    <div class="result-title">${esc(name)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}${eiTitleBadge(eiLk)}</div>
     <div class="result-issn">${issn ? 'ISSN ' + issn : ''}${wosBadge ? '  ' + wosBadge : ''}</div>
     <div class="result-grid">`;
   if (xrCat || xrQ) {
@@ -983,7 +1109,7 @@ function renderCard(m, extraClass = '') {
       <div class="label">影响因子</div>
       <div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div>
     </div>`;
-  h += cnCardBlock(cnHit) + csCardBlock(csHit, name) + cscdCardBlock(cdHit, name);
+  h += cnCardBlock(cnHit) + csCardBlock(csHit, name) + cscdCardBlock(cdHit, name) + eiCardBlock(eiLk, name);
   if (wosSubjShort) {
     h += `<div class="result-item full" style="padding:8px 12px;text-align:left">
       <div class="label" style="margin-bottom:2px">WoS学科</div>
@@ -992,6 +1118,38 @@ function renderCard(m, extraClass = '') {
   }
   h += `</div></div>`;
   return h;
+}
+
+// 「新锐分区库查不到」时给一句口径说明：按 北大 → 南大 → EI → CSCD 的优先级挑最有用的那条。
+// 单独抽出来是因为原先的嵌套三元已经嵌套到 5 层，加第 4 个库后可读性彻底崩掉。
+function zhFallbackNote(o) {
+  const NOT = '该刊未被新锐分区数据库收录（无影响因子 / JCR 分区）';
+  if (o.cnHit) return `${NOT}，但属于《中文核心期刊要目总览》(2023年版) 收录期刊 —— 投稿或成果认定时可按北大核心口径使用。`;
+  if (o.csHit) return `${NOT}，但属于南大 CSSCI ${esc(STATE.cs ? STATE.cs.version : '')}${o.csHit[1] === 1 ? ' 扩展版' : ' 来源期刊'} —— 认定口径请以本单位规定为准。`;
+  if (o.csCand && o.csCand.length) return `${NOT}。南大 CSSCI 目录中有 ${o.csCand.length} 本同名刊（见上方），若需认定收录层级请按主办单位 / 出版地进一步区分。`;
+  if (o.eiLk && !o.eiLk.disc) {
+    const isNew = o.eiLk.cn && o.eiLk.cn[6] === 1;
+    return `${NOT}，但属于 EI Compendex ${esc(STATE.ei ? STATE.ei.version : '')} 收录出版物${isNew ? '（2026 年新收录，早于该年的论文不在收录范围）' : ''} —— 工程类成果认定常单独列出该口径，具体请以本单位规定为准。`;
+  }
+  if (o.eiLk && o.eiLk.disc) return `${NOT}。该刊曾为 EI 来源出版物，现已停止收录（最终收录卷期见上方）—— 请按论文实际发表年份核对是否落在其 EI 收录期内。`;
+  if (o.cdHit) return `${NOT}，但属于中科院 CSCD ${esc(STATE.cscd ? STATE.cscd.version : '')}${o.cdHit[1] === 1 ? ' 扩展库' : ' 核心库'}来源期刊 —— 理工科成果认定常单独列出该口径，具体请以本单位规定为准。`;
+  if (o.cdCand && o.cdCand.length) return `${NOT}。中科院 CSCD 目录中有 ${o.cdCand.length} 本刊名以该串开头（见上方），请补全刊名确认。`;
+  return '该期刊暂未被新锐分区数据库收录。可能是新创期刊或尚未被索引。';
+}
+
+// 主库（新锐分区 / JCR）没有、但 EI 命中的独立卡片
+function eiStandaloneCard(lk, q) {
+  const title = lk.cn ? (lk.cn[0] || lk.cn[2]) : (lk.disc ? lk.disc[0] : lk.serial[0]);
+  return `<div class="result-card" style="border-left:3px solid #9a6b12">
+    <div class="result-title">${esc(title)}${eiTitleBadge(lk)}</div>
+    <div class="result-issn" style="font-size:12px;color:var(--sub)">该刊不在新锐分区 / JCR 数据库中，以下为 EI 收录信息</div>
+    <div class="result-grid">${eiCardBlock(lk, q)}</div>
+    <div style="margin-top:12px;padding:8px 10px;background:#fdf6e8;border-radius:8px;font-size:12px;color:#8a6512;line-height:1.5">
+      ${lk.disc
+        ? '该刊曾为 EI 来源出版物且已停止收录，故新锐分区库中也已无其记录。请按论文实际发表年份核对是否落在其 EI 收录期内。'
+        : '该刊未被新锐分区数据库收录（无影响因子 / JCR 分区），但属于 EI Compendex 收录出版物 —— 工程类成果认定常单独列出该口径，具体请以本单位规定为准。'}
+    </div>
+  </div>`;
 }
 
 function showResults(matches, source = '', unknownJournal = null, append = false) {
@@ -1016,10 +1174,12 @@ function showResults(matches, source = '', unknownJournal = null, append = false
     const csCand = csCandidates(rawName);
     const cdHit = findCscd(rawName);
     const cdCand = cscdCandidates(rawName);
-    const zhEdge = cnHit ? '#c0392b' : ((csHit || csCand.length) ? '#1a5c9e' : ((cdHit || cdCand.length) ? '#1e6f5c' : '#e67e22'));
+    const eiLkU = eiLookup(rawName, unknownJournal.issn);
+    const eiLkHas = !!(eiLkU && !eiLkU.disc);   // 停收不算「现役收录」，文案走未收录分支并附停止收录说明
+    const zhEdge = cnHit ? '#c0392b' : ((csHit || csCand.length) ? '#1a5c9e' : (eiLkHas ? '#9a6b12' : ((cdHit || cdCand.length) ? '#1e6f5c' : '#e67e22')));
     
     let html = `<div class="result-card" style="border-left:3px solid ${zhEdge}">
-      <div class="result-title">${jn || '未知期刊'}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}</div>
+      <div class="result-title">${jn || '未知期刊'}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}${eiTitleBadge(eiLkU)}</div>
       <div class="result-issn">${doi ? 'DOI: ' + doi : ''}</div>`;
     if (title) html += `<div style="font-size:12px;color:var(--sub);margin-bottom:12px;line-height:1.4">${title}</div>`;
     
@@ -1036,20 +1196,10 @@ function showResults(matches, source = '', unknownJournal = null, append = false
         <div class="label">影响因子</div>
         <div class="value" style="font-size:14px;color:var(--sub)">-</div>
       </div>
-      ${cnCardBlock(cnHit)}${csCardBlock(csHit, rawName)}${cscdCardBlock(cdHit, rawName)}
+      ${cnCardBlock(cnHit)}${csCardBlock(csHit, rawName)}${cscdCardBlock(cdHit, rawName)}${eiCardBlock(eiLkU, rawName)}
     </div>
-    <div style="margin-top:12px;padding:8px 10px;background:${cnHit ? '#fdf3f2' : ((csHit || csCand.length) ? '#eef4fb' : ((cdHit || cdCand.length) ? '#e9f3f0' : '#fef9f0'))};border-radius:8px;font-size:12px;color:${zhEdge};line-height:1.5">
-      ${cnHit
-        ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区），但属于《中文核心期刊要目总览》(2023年版) 收录期刊 —— 投稿或成果认定时可按北大核心口径使用。`
-        : (csHit
-          ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区），但属于南大 CSSCI ${esc(STATE.cs ? STATE.cs.version : '')}${csHit[1] === 1 ? ' 扩展版' : ' 来源期刊'} —— 认定口径请以本单位规定为准。`
-          : (csCand.length
-            ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区）。南大 CSSCI 目录中有 ${csCand.length} 本同名刊（见上方），若需认定收录层级请按主办单位 / 出版地进一步区分。`
-            : (cdHit
-              ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区），但属于中科院 CSCD ${esc(STATE.cscd ? STATE.cscd.version : '')}${cdHit[1] === 1 ? ' 扩展库' : ' 核心库'}来源期刊 —— 理工科成果认定常单独列出该口径，具体请以本单位规定为准。`
-              : (cdCand.length
-                ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区）。中科院 CSCD 目录中有 ${cdCand.length} 本刊名以该串开头（见上方），请补全刊名确认。`
-                : '该期刊暂未被新锐分区数据库收录。可能是新创期刊或尚未被索引。'))))}
+    <div style="margin-top:12px;padding:8px 10px;background:${cnHit ? '#fdf3f2' : ((csHit || csCand.length) ? '#eef4fb' : ((cdHit || cdCand.length) ? '#e9f3f0' : (eiLkHas ? '#fdf6e8' : '#fef9f0')))};border-radius:8px;font-size:12px;color:${zhEdge};line-height:1.5">
+      ${zhFallbackNote({ cnHit, csHit, csCand, cdHit, cdCand, eiLk: eiLkU })}
     </div></div>`;
     
     if (source) {
@@ -1066,6 +1216,30 @@ function showResults(matches, source = '', unknownJournal = null, append = false
   // Case: no matches at all
   if (!matches.length) {
     if (!append) {
+      // 主库（新锐分区 / JCR）没有 ≠ 没被任何口径收录：EI 独有刊约 6200 条且多为工程类，
+      // 北大 / 南大 / CSCD 的纯中文刊也大多不在那张国际库里。
+      // 刊名搜索模式下再联查一次，四库任一命中就出卡，避免给出「未找到」这一误导性结论。
+      const q = $('nameInput') ? $('nameInput').value.trim() : '';
+      const issnQ = eiIssnKey(q);
+      if (issnQ) {
+        // 输入的是 ISSN：直接用 EI 记录自身的刊名做标题，比回显一串数字有用
+        const lk = STATE.ei ? eiLookup('', issnQ) : null;
+        if (lk) {
+          el.innerHTML = eiStandaloneCard(lk, q);
+          $('emptyState').classList.add('hidden');
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
+        }
+      } else if (q) {
+        const eiLk = STATE.ei ? eiLookup(q, '') : null;
+        // eiCandidates 也算命中：前缀多解时得把候选列出来，而不是报「未找到」
+        if (eiLk || findCn(q) || findCs(q) || findCscd(q) ||
+            csCandidates(q).length || cscdCandidates(q).length || eiCandidates(q).length) {
+          // 交给 unknownJournal 分支渲染：它会同时给出四库信息块与口径说明
+          showResults([], '', { journal: q });
+          return;
+        }
+      }
       el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到匹配的期刊<br>请尝试用ISSN或完整期刊名搜索</div></div>`;
       $('emptyState').classList.add('hidden');
     }
@@ -1432,15 +1606,327 @@ function cscdTitleBadge(cscdHit) {
 }
 
 
-// ==================== 合并反向定位（北大 + 南大 + CSCD） ====================
+// ==================== EI Compendex 联查 ====================
+// 匹配策略与 findCn / findCs / findCscd 一致：精确 → 剥尾部括号 → 前缀级双向。
+// EI 与前三库的两点差异：
+//   1) 以 ISSN 为主键优先（源表 ISSN 覆盖率高，且英文刊名写法差异大），刊名兜底；
+//   2) 多出一张 DISCONTINUED 表 —— 停收刊不在主表里，只查主表会把老论文误判成「未收录」。
+// 纯西文刊名把最短长度门槛提到 6：4 个字母的英文串在正文里太常见，容易误报。
+function _eiMinLen(key) {
+  return /^[\x00-\x7f]+$/.test(key) ? 6 : 4;
+}
+
+// 在 EI 主表（SERIALS，全部连续出版物）里按刊名匹配；命中返回行，否则 null
+function findEiSerial(name) {
+  const ei = STATE.ei;
+  if (!ei || !name) return null;
+  const raw = String(name);
+  const key = eiKey(raw);
+  if (!key) return null;
+
+  const hit = ei.byKey.get(key);
+  if (hit !== undefined) return ei.serials[hit];
+
+  const stripped = eiKey(raw.replace(/[（(【\[][^）)】\]]{1,24}[）)】\]]/g, ''));
+  if (stripped && stripped !== key) {
+    const h2 = ei.byKey.get(stripped);
+    if (h2 !== undefined) return ei.serials[h2];
+  }
+
+  const minLen = _eiMinLen(key);
+  if (key.length < minLen) return null;
+
+  // 3a) 库中刊名以查询串开头：要求唯一，多了说明查询串不完整 → 不认
+  let cand = null, n = 0;
+  for (let i = 0, len = ei.keys.length; i < len; i++) {
+    const k = ei.keys[i];
+    if (!k || k.length < minLen) continue;
+    if (k.startsWith(key)) { cand = ei.serials[i]; if (++n > 1) return null; }
+  }
+  if (n === 1) return cand;
+
+  // 3b) 查询串以库中刊名开头（尾部有残留）：取最长匹配，并列则不认
+  let best = null, bestLen = 0, tie = false;
+  for (let i = 0, len = ei.keys.length; i < len; i++) {
+    const k = ei.keys[i];
+    if (!k || k.length < minLen) continue;
+    if (key.startsWith(k)) {
+      if (k.length > bestLen) { best = ei.serials[i]; bestLen = k.length; tie = false; }
+      else if (k.length === bestLen) tie = true;
+    }
+  }
+  return (best && !tie) ? best : null;
+}
+
+// 在 EI 中文刊专表里匹配（中文名 / 英文译名 / 罗马字 三个名字都认）
+function findEiCn(name) {
+  const ei = STATE.ei;
+  if (!ei || !name) return null;
+  const raw = String(name);
+  const key = eiKey(raw);
+  if (!key) return null;
+
+  const hit = ei.cnByKey.get(key);
+  if (hit !== undefined) return ei.cn[hit];
+
+  const stripped = eiKey(raw.replace(/[（(【\[][^）)】\]]{1,24}[）)】\]]/g, ''));
+  if (stripped && stripped !== key) {
+    const h2 = ei.cnByKey.get(stripped);
+    if (h2 !== undefined) return ei.cn[h2];
+  }
+
+  const minLen = _eiMinLen(key);
+  if (key.length < minLen) return null;
+
+  let cand = null, n = 0;
+  for (let i = 0, len = ei.cn.length; i < len; i++) {
+    for (const k of ei.cnKeys[i]) {
+      if (!k || k.length < minLen) continue;
+      if (k.startsWith(key)) { cand = ei.cn[i]; if (++n > 1) return null; break; }
+    }
+    if (n > 1) return null;
+  }
+  return n === 1 ? cand : null;
+}
+
+// 在 DISCONTINUED（停止收录表）里匹配
+function findEiDisc(name) {
+  const ei = STATE.ei;
+  if (!ei || !name) return null;
+  const key = eiKey(name);
+  if (!key) return null;
+  const hit = ei.discByKey.get(key);
+  return hit !== undefined ? ei.disc[hit] : null;
+}
+
+// 统一入口：先按 ISSN（最可靠），再按刊名。返回 {serial|cn|disc, by}，未命中返回 null
+function eiLookup(name, issn) {
+  const ei = STATE.ei;
+  if (!ei) return null;
+  const k = eiIssnKey(issn);
+  if (k) {
+    if (ei.cnByIssn.has(k)) return { cn: ei.cn[ei.cnByIssn.get(k)], by: 'issn' };
+    if (ei.byIssn.has(k)) return { serial: ei.serials[ei.byIssn.get(k)], by: 'issn' };
+    if (ei.discByIssn.has(k)) return { disc: ei.disc[ei.discByIssn.get(k)], by: 'issn' };
+  }
+  const nm = String(name || '').trim();
+  if (!nm) return null;
+
+  // 精确匹配要在三张表之间全部走完，才能进模糊前缀。
+  // 否则已停收的刊会被另一本现役刊的前缀匹配抢先命中 —— 实测
+  // 「Advanced Materials Research」(停收 2014) 会被「Advanced Materials」(现役) 抢走，
+  // 结果把停收刊误报成现役 EI 收录，属事实性误判。
+  const tries = [nm];
+  const stripped = nm.replace(/[（(【\[][^）)】\]]{1,24}[）)】\]]/g, '');
+  if (stripped && stripped !== nm) tries.push(stripped);
+  for (let i = 0; i < tries.length; i++) {
+    const key = eiKey(tries[i]);
+    if (!key) continue;
+    const ci = ei.cnByKey.get(key);
+    if (ci !== undefined) return { cn: ei.cn[ci], by: 'name' };
+    const si = ei.byKey.get(key);
+    if (si !== undefined) return { serial: ei.serials[si], by: 'name' };
+    const di = ei.discByKey.get(key);
+    if (di !== undefined) return { disc: ei.disc[di], by: 'name' };
+  }
+
+  const c = findEiCn(nm);
+  if (c) return { cn: c, by: 'name' };
+  const s = findEiSerial(nm);
+  if (s) return { serial: s, by: 'name' };
+  const d = findEiDisc(nm);
+  if (d) return { disc: d, by: 'name' };
+  return null;
+}
+
+// 查询串过短或前缀命中多本时列候选，避免报「未收录」这一事实性误报
+function eiCandidates(name) {
+  const ei = STATE.ei;
+  if (!ei || !name) return [];
+  const key = eiKey(name);
+  if (!key || key.length < 4) return [];
+  if (ei.byKey.has(key) || ei.cnByKey.has(key)) return [];
+  const out = [];
+  for (let i = 0, len = ei.serials.length; i < len && out.length <= 10; i++) {
+    const k = ei.keys[i];
+    if (k && k.length > key.length && k.startsWith(key)) out.push(ei.serials[i]);
+  }
+  return (out.length > 1 && out.length <= 10) ? out : [];
+}
+
+function eiSubjText(ids, limit = 3) {
+  const ei = STATE.ei;
+  if (!ei || !ids || !ids.length) return '';
+  const names = ids.map(i => ei.subj[i]).filter(Boolean);
+  if (!names.length) return '';
+  return names.slice(0, limit).join(' · ') + (names.length > limit ? ` 等 ${names.length} 个学科` : '');
+}
+
+// 标题旁的 EI 徽标
+function eiTitleBadge(lk) {
+  if (!lk) return '';
+  if (lk.disc) return '<span class="badge-ei-disc" style="font-size:10px;padding:2px 6px;margin-left:4px">EI 已停收</span>';
+  if (lk.cn && lk.cn[6] === 1) return '<span class="badge-ei-new" style="font-size:10px;padding:2px 6px;margin-left:4px">EI 新收录</span>';
+  return '<span class="badge-ei" style="font-size:10px;padding:2px 6px;margin-left:4px">EI</span>';
+}
+
+// 卡片内的 EI 信息块（DOI / 刊名搜索 / PDF / 中文收录页共用）
+function eiCardBlock(lk, name) {
+  if (!STATE.ei) return '';   // 数据未就绪时不显示，避免误报「未收录」
+  const ei = STATE.ei;
+
+  if (!lk) {
+    const cands = eiCandidates(name);
+    if (cands.length) {
+      const list = cands.map(r => {
+        const t = EI_TYPE_LABEL[r[1]] || r[1] || '出版物';
+        return `<div style="margin-top:3px">· <b>${esc(r[0])}</b> —— ${esc(t)}${r[5] ? ' · ' + esc(r[5]) : ''}</div>`;
+      }).join('');
+      return `<div class="result-item full" style="padding:8px 12px;text-align:left">
+      <div class="label" style="margin-bottom:2px">EI 收录</div>
+      <div class="value" style="font-size:12px;font-weight:400;color:#8a6512">⚠ EI 目录中有 ${cands.length} 条记录以该串开头，请补全刊名确认：</div>
+      <div style="font-size:11px;color:#8a6512;font-weight:400;line-height:1.6">${list}</div>
+    </div>`;
+    }
+    return `<div class="result-item full" style="padding:8px 12px;text-align:left">
+      <div class="label" style="margin-bottom:2px">EI 收录</div>
+      <div class="value" style="font-size:12px;font-weight:400;color:#bbb">未收录（非 EI 来源出版物）</div>
+    </div>`;
+  }
+
+  // 曾收录、现已停止
+  if (lk.disc) {
+    const r = lk.disc;
+    const cover = [
+      r[3] ? r[3] + ' 年' : '',
+      r[4] ? 'vol ' + r[4] : '',
+      (r[5] && r[5] !== 'N/A') ? 'no ' + r[5] : '',
+      (r[6] && r[6] !== 'N/A') ? 'pp. ' + r[6] : ''
+    ].filter(Boolean).join(' · ');
+    return `<div class="result-item full" style="padding:9px 12px;text-align:left;background:#f5f2ea;border-radius:8px">
+      <div class="label" style="margin-bottom:3px">EI 收录</div>
+      <div class="value" style="font-size:14px;font-weight:700;color:#7d7154">⚠ 曾为 EI 来源出版物，现已停止收录</div>
+      <div style="font-size:11px;color:#8a8060;margin-top:3px;font-weight:400">
+        最终收录至 ${esc(cover || '（源表未给出卷期）')} &nbsp;·&nbsp; 晚于该卷期的论文不在 EI 收录范围
+      </div>
+    </div>`;
+  }
+
+  // 中文刊专表命中（信息最全）
+  if (lk.cn) {
+    const [cnName, roman, enTitle, p, o, lang, status, subjIds] = lk.cn;
+    const issns = [p ? 'ISSN ' + fmtIssn(p) : '', o ? 'eISSN ' + fmtIssn(o) : ''].filter(Boolean).join(' · ');
+    const subj = eiSubjText(subjIds, 4);
+    const isNew = status === 1;
+    return `<div class="result-item full" style="padding:9px 12px;text-align:left;background:${isNew ? '#fdf6e8' : '#fdf3e0'};border-radius:8px">
+      <div class="label" style="margin-bottom:3px">EI 收录</div>
+      <div class="value" style="font-size:14px;font-weight:700;color:#8a6512">${isNew ? '◻' : '✅'} EI ${esc(ei.version)} 收录 · ${esc(EI_CN_LANG[lang] || '中文刊')}${isNew ? ' · 2026 年新收录' : ' · 保持收录'}</div>
+      <div style="font-size:11px;color:#a08a56;margin-top:3px;font-weight:400">
+        ${issns ? esc(issns) + ' &nbsp;·&nbsp; ' : ''}${enTitle ? esc(enTitle) + ' &nbsp;·&nbsp; ' : ''}${esc(ei.src || '')}
+      </div>${subj ? `<div style="font-size:11px;color:#a08a56;margin-top:2px;font-weight:400">EI 学科：${esc(subj)}</div>` : ''}
+      ${isNew ? '<div style="font-size:11px;color:#a08a56;margin-top:2px;font-weight:400">⚠ 新收录：早于 2026 年发表的论文不在 EI 收录范围</div>' : ''}
+    </div>`;
+  }
+
+  // 主表命中（连续出版物）
+  const r = lk.serial;
+  const type = EI_TYPE_LABEL[r[1]] || r[1] || '出版物';
+  const lang = ei.langs[r[6]] || '';
+  const issns = [r[2] ? 'ISSN ' + fmtIssn(r[2]) : '', r[3] ? 'eISSN ' + fmtIssn(r[3]) : ''].filter(Boolean).join(' · ');
+  const subj = eiSubjText(r[7], 4);
+  const meta = [issns, r[5], lang].filter(Boolean).join(' · ');
+  return `<div class="result-item full" style="padding:9px 12px;text-align:left;background:#fdf3e0;border-radius:8px">
+      <div class="label" style="margin-bottom:3px">EI 收录</div>
+      <div class="value" style="font-size:14px;font-weight:700;color:#8a6512">✅ EI ${esc(ei.version)} 收录 · ${esc(type)}</div>
+      <div style="font-size:11px;color:#a08a56;margin-top:3px;font-weight:400">
+        ${meta ? esc(meta) + ' &nbsp;·&nbsp; ' : ''}${r[4] ? esc(r[4]) : ''}
+      </div>${subj ? `<div style="font-size:11px;color:#a08a56;margin-top:2px;font-weight:400">EI 学科：${esc(subj)}</div>` : ''}
+    </div>`;
+}
+
+// 中文收录页 · EI 库搜索（中文名 / 英文译名 / 罗马字 / ISSN 都能查）
+function searchEiCnJournals(query, limit = 40) {
+  const ei = STATE.ei;
+  if (!ei || !query) return [];
+  const q = eiKey(query);
+  const issn = issnQuery(query);
+  if (!q && !issn) return [];
+  const starts = [], contains = [];
+  for (let i = 0; i < ei.cn.length; i++) {
+    const r = ei.cn[i];
+    let bucket = null;
+    if (q) {
+      for (const k of ei.cnKeys[i]) {
+        const p = k.indexOf(q);
+        if (p === 0) { bucket = starts; break; }
+        if (p > 0) bucket = contains;
+      }
+    }
+    // 源表 ISSN 存的是 8 位无连字符大写形式，故前缀比对直接用归一后的查询串
+    if (!bucket && issn && ((r[3] && r[3].indexOf(issn) === 0) || (r[4] && r[4].indexOf(issn) === 0))) bucket = starts;
+    if (bucket) bucket.push(r);
+  }
+  return starts.concat(contains).slice(0, limit);
+}
+
+// EI 中文刊专表行 = [中文刊名, 罗马字, 英文译名, PRINT ISSN, ONLINE ISSN, 语种, 收录状况, [学科下标]]
+// 语种 0=中文 1=英文 2=中英双语；收录状况 0=保持收录 1=新收录
+function renderEiCard(m, extraClass = '') {
+  const ei = STATE.ei;
+  const [cnName, roman, enTitle, p, o, lang, status, subjIds] = m;
+  const title = cnName || enTitle || roman || '';
+  const sub = cnName ? (enTitle || roman || '') : (roman || '');
+  const issns = [p ? 'ISSN ' + fmtIssn(p) : '', o ? 'eISSN ' + fmtIssn(o) : ''].filter(Boolean).join(' · ');
+  const subj = eiSubjText(subjIds, 5);
+  const isNew = status === 1;
+
+  return `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
+    <div class="result-title">${esc(title)}${isNew
+      ? '<span class="badge-ei-new" style="font-size:10px;padding:2px 6px;margin-left:4px">2026 新收录</span>'
+      : '<span class="badge-ei" style="font-size:10px;padding:2px 6px;margin-left:4px">EI</span>'}</div>
+    ${sub ? `<div style="font-size:12px;color:var(--sub);margin:2px 0 4px">${esc(sub)}</div>` : ''}
+    <div class="result-issn">${esc(issns)}${issns ? ' &nbsp; ' : ''}<span class="badge-ei-new">${esc(EI_CN_LANG[lang] || '')}</span></div>
+    <div class="result-grid">
+      <div class="result-item full">
+        <div class="label">Ei 收录状况</div>
+        <div class="value" style="font-size:15px;color:#8a6512">${isNew ? '新收录（2026 年首次收录）' : '保持收录'}</div>
+      </div>
+      <div class="result-item full">
+        <div class="label" style="margin-bottom:2px">刊物编号</div>
+        <div class="value" style="font-size:12px;font-weight:400;color:var(--sub)">${issns ? esc(issns) : '<span style="color:#bbb">源表未给出 ISSN</span>'}</div>
+      </div>${subj ? `<div class="result-item full">
+        <div class="label" style="margin-bottom:2px">EI 学科</div>
+        <div class="value" style="font-size:12px;font-weight:400;color:var(--sub)">${esc(subj)}</div>
+      </div>` : ''}
+    </div>
+    <div class="cn-tip ei">${isNew
+      ? `◻ 该刊自 ${esc(ei ? ei.version : '2026')} 起被 Ei 收录 · 早于该年发表的论文不在 EI 收录范围`
+      : `✅ 该刊被 Ei ${esc(ei ? ei.version : '')} 持续收录 · 中文刊专表，收录状况以 Elsevier 源表为准`}</div>
+  </div>`;
+}
+
+// 中文收录页 · EI 按学科浏览（学科取自主表回填，一本刊可属多个 EI 学科）
+function showEiSubj(si, status, head) {
+  const ei = STATE.ei;
+  if (!ei) return;
+  const list = ei.cn.filter(r => r[6] === status && (r[7] || []).indexOf(si) >= 0);
+  const nm = ei.subj[si] || '';
+  const source = `📚 <b>${esc(nm)}</b> · 共 ${list.length} 种<br><span style="color:#aaa">${esc(head)} · EI ${esc(ei.version)} · 一本刊可属多个 EI 学科</span>`;
+  $('cnBrowseArea').classList.add('hidden');
+  $('cnSuggestions').classList.remove('show');
+  showCnResults(list, source);
+}
+
+
+// ==================== 合并反向定位（北大 + 南大 + CSCD + EI） ====================
 // 两张刊名表合一后扫正文：一次扫完取「位置最靠前 + 名字最长」的那个，
 // 再回头分别判它属于北大核心 / 南大核心的哪一档。
 // 合并而不是各扫各的，是为了避免两边各报一个不同刊物。
 let zhCandCache = null, zhCandStamp = '';
 
 function zhCandidates() {
-  const cn = STATE.cn, cs = STATE.cs, cd = STATE.cscd;
-  const stamp = (cn ? cn.total : 0) + '|' + (cs ? cs.total + '/' + cs.extTotal : 0) + '|' + (cd ? cd.total : 0);
+  const cn = STATE.cn, cs = STATE.cs, cd = STATE.cscd, ei = STATE.ei;
+  const stamp = (cn ? cn.total : 0) + '|' + (cs ? cs.total + '/' + cs.extTotal : 0) + '|' + (cd ? cd.total : 0) + '|' + (ei ? ei.cnTotal : 0);
   if (zhCandCache && zhCandStamp === stamp) return zhCandCache;
 
   const normList = [], rawList = [], seen = new Set();
@@ -1464,6 +1950,17 @@ function zhCandidates() {
       n2.push(cscdKey(nm)); r2.push(nm);
     });
     push(n2, r2);
+  }
+  // EI 同理只并入中文刊名：EI 中文刊专表里 188 本是国内办的英文刊（BMEMat、eScience 等），
+  // 其英文名与中文 PDF 英文摘要里的常见词高度重合，混进来会误命中。
+  if (ei) {
+    const n3 = [], r3 = [];
+    ei.cn.forEach(r => {
+      const nm = r[0] || '';
+      if (!/[\u4e00-\u9fa5]/.test(nm)) return;
+      n3.push(eiKey(nm)); r3.push(nm);
+    });
+    push(n3, r3);
   }
 
   zhCandCache = { norms: normList, raws: rawList };
@@ -1495,9 +1992,20 @@ function zhFindInText(text) {
     return bi < 0 ? null : raws[bi];
   };
 
+  // 短行专用：整行归一化后与某候选刊名完全相同才认。短行没有上下文，
+  // 若也允许子串匹配，页脚里的「学术月刊社」会被报成《学术月刊》。
+  const exactName = (norm) => {
+    const i = norms.indexOf(norm);
+    return i < 0 ? null : raws[i];
+  };
+
   const scanOne = (piece) => {
     const norm = normalizeCn(piece);
-    if (norm.length < 6) return null;
+    // 门槛与 zhCandidates 的候选下限（4 字）对齐。此前写死 6 字，导致归一化后只有 4~5 字的刊名
+    // （《新型碳材料》《学术月刊》《探索与争鸣》等，全库 1400 余种）在页眉单独成行时被整行跳过，
+    // 属真实漏识别；放宽后短行只认整行严格相等，不放大误判。
+    if (norm.length < 4) return null;
+    if (norm.length < 6) return exactName(norm);
     // 第一轮：篇首 400 字内取最靠前的（中文期刊刊名一般在页眉）
     // 第二轮：仍无果才放开到整段，但必须唯一命中
     return scan(norm.slice(0, 400), false) || scan(norm, true);
@@ -1515,14 +2023,15 @@ function zhFindInText(text) {
 
 // 正文兜底识别（北大 + 南大 + CSCD 联合）。命中则直接出结果并返回 true。
 function zhTextFallback(info, source, appendMode) {
-  if (!info || (!STATE.cn && !STATE.cs && !STATE.cscd)) return false;
+  if (!info || (!STATE.cn && !STATE.cs && !STATE.cscd && !STATE.ei)) return false;
   const text = info.headText || info.firstPageText || '';
   if (!text) return false;
 
   const nm = zhFindInText(text);
   if (!nm) return false;
   const cnHit = findCn(nm), csHit = findCs(nm), cdHit = findCscd(nm);
-  if (!cnHit && !csHit && !cdHit && !csCandidates(nm).length && !cscdCandidates(nm).length) return false;
+  const eiLk = eiLookup(nm, info.issn);
+  if (!cnHit && !csHit && !cdHit && !eiLk && !csCandidates(nm).length && !cscdCandidates(nm).length) return false;
 
   const srcX = `PDF正文识别: ${esc(nm)}`;
   const mX = searchJournals(nm);
@@ -1540,11 +2049,11 @@ function zhTextFallback(info, source, appendMode) {
 
   // 新锐库里没有，但至少一个中文库有 → 直接出中文卡片，避免误报「未收录」
   if (appendMode) {
-    const edge = cnHit ? '#c0392b' : (csHit ? '#1a5c9e' : '#1e6f5c');
+    const edge = cnHit ? '#c0392b' : (csHit ? '#1a5c9e' : (eiLk ? '#9a6b12' : '#1e6f5c'));
     $('results').insertAdjacentHTML('beforeend',
       `<div class="result-card" style="border-left:3px solid ${edge};margin-bottom:12px">
-        <div class="result-title">${esc(nm)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}</div>
-        <div class="result-grid">${cnCardBlock(cnHit)}${csCardBlock(csHit, nm)}${cscdCardBlock(cdHit, nm)}</div>
+        <div class="result-title">${esc(nm)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}${eiTitleBadge(eiLk)}</div>
+        <div class="result-grid">${cnCardBlock(cnHit)}${csCardBlock(csHit, nm)}${cscdCardBlock(cdHit, nm)}${eiCardBlock(eiLk, nm)}</div>
       </div>`);
   } else {
     showResults([], srcX, { journal: nm, title: info.title });
@@ -1725,14 +2234,19 @@ function showCnResults(list, source = '', query = '', append = false) {
   const el = $('results');
   const isCs = STATE.cnLib === 'cs';
   const isCscd = STATE.cnLib === 'cscd';
-  const cardFn = isCscd ? renderCscdCard : (isCs ? renderCsCard : renderCnCard);
-  const accent = isCscd ? '#1e6f5c' : (isCs ? '#1a5c9e' : '#c0392b');
+  const isEi = STATE.cnLib === 'ei';
+  const cardFn = isEi ? renderEiCard : (isCscd ? renderCscdCard : (isCs ? renderCsCard : renderCnCard));
+  const accent = isEi ? '#9a6b12' : (isCscd ? '#1e6f5c' : (isCs ? '#1a5c9e' : '#c0392b'));
   if (!append) el.innerHTML = '';
   $('emptyState').classList.add('hidden');
 
   if (!list.length) {
     if (append) return;
-    if (isCscd) {
+    if (isEi) {
+      const ei = STATE.ei;
+      const tot = ei ? `${ei.cnTotal} 种` : '390 种';
+      el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到「${esc(query)}」<br>EI(2026-05-01) 中文刊专表共 ${tot}<br><span style="font-size:12px;color:#aaa">可输入中文刊名、英文译名或 ISSN，如"硅酸盐""Tunnel"</span></div></div>`;
+    } else if (isCscd) {
       const cd = STATE.cscd;
       const tot = cd ? `${cd.total} 种（核心库 ${cd.coreTotal} + 扩展库 ${cd.extTotal}）` : '1501 种';
       el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到「${esc(query)}」<br>CSCD(2025-2026) 共 ${tot}<br><span style="font-size:12px;color:#aaa">可尝试期刊简称，如"岩土""材料"；英文刊请输入英文刊名</span></div></div>`;
@@ -1785,7 +2299,19 @@ function showCnResults(list, source = '', query = '', append = false) {
 function showCnSuggestions(list) {
   const el = $('cnSuggestions');
   if (!list.length) { el.classList.remove('show'); el.innerHTML = ''; return; }
-  if (STATE.cnLib === 'cscd') {
+  if (STATE.cnLib === 'ei') {
+    el.innerHTML = list.map((j, i) => {
+      const title = j[0] || j[2] || j[1] || '';
+      const sub = eiSubjText(j[7], 2);
+      const badge = j[6] === 1
+        ? '<span class="badge-ei-new">2026 新收录</span>'
+        : '<span class="badge-ei">EI 收录</span>';
+      return `<div class="sug-item" data-idx="${i}">
+        <div class="sug-name">${esc(title)}</div>
+        <div class="sug-meta">${badge}<span style="color:#888;font-size:11px">${esc(EI_CN_LANG[j[5]] || '')}${sub ? ' · ' + esc(sub) : ''}</span></div>
+      </div>`;
+    }).join('');
+  } else if (STATE.cnLib === 'cscd') {
     const cd = STATE.cscd;
     el.innerHTML = list.map((j, i) => {
       const isExt = j[1] === 1;
@@ -1831,7 +2357,30 @@ function renderCnBrowse() {
   area.dataset.rendered = '';
   let h = '';
 
-  if (STATE.cnLib === 'cscd') {
+  if (STATE.cnLib === 'ei') {
+    const ei = STATE.ei;
+    if (!ei) { area.innerHTML = '<div class="cn-disc-item" style="cursor:default;color:#999">数据加载中…</div>'; return; }
+    // 一本刊可同时属多个 EI 学科，故各学科条目数之和会大于该组总刊数（组头标的才是总刊数）
+    const grp = (title, status) => {
+      const cnt = new Array(ei.subj.length).fill(0);
+      let total = 0;
+      ei.cn.forEach(r => {
+        if (r[6] !== status) return;
+        total++;
+        (r[7] || []).forEach(si => { cnt[si]++; });
+      });
+      let inner = '';
+      cnt.forEach((n, si) => {
+        if (!n) return;
+        inner += `<div class="cn-disc-item" data-eisubj="${si}" data-eistatus="${status}" data-eihead="${esc(title)}">
+          <span>${esc(ei.subj[si])}</span><span class="cn-disc-count">${n} 种</span>
+        </div>`;
+      });
+      if (inner) h += `<div class="cn-disc-head ei">${esc(title)}（${total} 种）</div>` + inner;
+    };
+    grp('EI 保持收录', 0);
+    grp('EI 2026 年新收录', 1);
+  } else if (STATE.cnLib === 'cscd') {
     const cd = STATE.cscd;
     if (!cd) { area.innerHTML = '<div class="cn-disc-item" style="cursor:default;color:#999">数据加载中…</div>'; return; }
     const grp = (title, lib) => {
@@ -2043,15 +2592,17 @@ let cnSuggIndex = -1;
 
 // 当前库是否就绪
 function zhLibReady() {
+  if (STATE.cnLib === 'ei') return STATE.eiLoaded;
   if (STATE.cnLib === 'cscd') return STATE.cscdLoaded;
   return STATE.cnLib === 'cs' ? STATE.csLoaded : STATE.cnLoaded;
 }
 function zhSearch(q, limit) {
+  if (STATE.cnLib === 'ei') return searchEiCnJournals(q, limit);
   if (STATE.cnLib === 'cscd') return searchCscdJournals(q, limit);
   return STATE.cnLib === 'cs' ? searchCsJournals(q, limit) : searchCnJournals(q, limit);
 }
 
-// 库切换（北大核心 / 南大核心 CSSCI / 中科院 CSCD）
+// 库切换（北大核心 / 南大核心 CSSCI / 中科院 CSCD / EI）
 $$('#libSwitch button').forEach(btn => {
   btn.addEventListener('click', () => {
     STATE.cnLib = btn.dataset.lib;
@@ -2063,11 +2614,13 @@ $$('#libSwitch button').forEach(btn => {
     $('results').innerHTML = '';
     $('emptyState').classList.remove('hidden');
     const inp = $('cnInput');
-    inp.placeholder = STATE.cnLib === 'cscd'
-      ? '输入中文 / 英文期刊名，如：岩土工程学报'
-      : (STATE.cnLib === 'cs'
-        ? '输入中文期刊名，如：经济研究'
-        : '输入中文期刊名，如：岩土工程学报');
+    inp.placeholder = STATE.cnLib === 'ei'
+      ? '输入中文刊名 / 英文译名，如：硅酸盐学报、Tunnel'
+      : (STATE.cnLib === 'cscd'
+        ? '输入中文 / 英文期刊名，如：岩土工程学报'
+        : (STATE.cnLib === 'cs'
+          ? '输入中文期刊名，如：经济研究'
+          : '输入中文期刊名，如：岩土工程学报'));
     inp.value = '';
     $('cnClearBtn').classList.add('hidden');
     updateZhStat();
@@ -2122,11 +2675,13 @@ $('cnInput').addEventListener('keydown', function(e) {
     if (!q) return;
     if (!zhLibReady()) { showToast('中文收录数据加载中，请稍候'); return; }
     const res = zhSearch(q, 200);
-    const head = STATE.cnLib === 'cscd'
-      ? `🔍 <b>${esc(q)}</b> · CSCD ${esc(STATE.cscd ? STATE.cscd.version : '')}`
-      : (STATE.cnLib === 'cs'
-        ? `🔍 <b>${esc(q)}</b> · CSSCI ${esc(STATE.cs ? STATE.cs.version : '')}`
-        : `🔍 <b>${esc(q)}</b> · 北大核心 2023 版`);
+    const head = STATE.cnLib === 'ei'
+      ? `🔍 <b>${esc(q)}</b> · EI 中文刊 ${esc(STATE.ei ? STATE.ei.version : '')}`
+      : (STATE.cnLib === 'cscd'
+        ? `🔍 <b>${esc(q)}</b> · CSCD ${esc(STATE.cscd ? STATE.cscd.version : '')}`
+        : (STATE.cnLib === 'cs'
+          ? `🔍 <b>${esc(q)}</b> · CSSCI ${esc(STATE.cs ? STATE.cs.version : '')}`
+          : `🔍 <b>${esc(q)}</b> · 北大核心 2023 版`));
     showCnResults(res, res.length ? head : '', q);
     sugEl.classList.remove('show');
   }
@@ -2155,6 +2710,10 @@ $('cnBrowseBtn').addEventListener('click', () => {
 $('cnBrowseArea').addEventListener('click', e => {
   const item = e.target.closest('.cn-disc-item');
   if (!item) return;
+  if (item.dataset.eisubj !== undefined) {
+    showEiSubj(parseInt(item.dataset.eisubj, 10), parseInt(item.dataset.eistatus, 10), item.dataset.eihead || '');
+    return;
+  }
   if (item.dataset.cscdcls !== undefined) {
     showCscdDisc(parseInt(item.dataset.cscdcls, 10), parseInt(item.dataset.cscdlib, 10), item.dataset.cscdhead || '');
     return;
@@ -2337,7 +2896,7 @@ async function processPdf(file, idx = 1, total = 1) {
             <div style="font-size:15px;font-weight:600;margin-bottom:6px">没能确认这篇 PDF 的刊名</div>
             <div style="font-size:13px;color:var(--sub);line-height:1.6">
               ${readChars
-                ? `已读到 PDF 的文字（页眉页脚共 ${readChars} 字），但没能在北大核心 2023 年版的 1987 种、南大 CSSCI 的 935 种、以及中科院 CSCD 的 1501 种名单里找到对应刊名。`
+                ? `已读到 PDF 的文字（页眉页脚共 ${readChars} 字），但没能在北大核心 2023 年版的 1987 种、南大 CSSCI 的 935 种、中科院 CSCD 的 1501 种，以及 EI 中文刊的 390 种名单里找到对应刊名。`
                 : `这个 PDF 里没有可提取的文字（多半是扫描件／图片版），页眉页脚读不出内容。`}<br><br>
               <span style="font-weight:500;color:var(--text)">可能的原因：</span><br>
               &nbsp;1.&nbsp; 该刊<span style="font-weight:500">既非北大中文核心，也不属于南大 CSSCI</span>（行业刊、内部刊等）<br>
@@ -2389,12 +2948,13 @@ async function processPdf(file, idx = 1, total = 1) {
           const cnHitA = findCn(crossrefInfo.journal || '');
           const csHitA = findCs(crossrefInfo.journal || '');
           const cdHitA = findCscd(crossrefInfo.journal || '');
-          const edgeA = cnHitA ? '#c0392b' : (csHitA ? '#1a5c9e' : (cdHitA ? '#1e6f5c' : '#e67e22'));
+          const eiLkA = eiLookup(crossrefInfo.journal || '', crossrefInfo.issn);
+          const edgeA = cnHitA ? '#c0392b' : (csHitA ? '#1a5c9e' : ((eiLkA && !eiLkA.disc) ? '#9a6b12' : (cdHitA ? '#1e6f5c' : '#e67e22')));
           $('results').insertAdjacentHTML('beforeend',
             `<div class="result-card" style="border-left:3px solid ${edgeA};margin-bottom:12px">
-              <div class="result-title">${esc(rawJ)}${cnTitleBadge(cnHitA)}${csTitleBadge(csHitA)}${cscdTitleBadge(cdHitA)}</div>
+              <div class="result-title">${esc(rawJ)}${cnTitleBadge(cnHitA)}${csTitleBadge(csHitA)}${cscdTitleBadge(cdHitA)}${eiTitleBadge(eiLkA)}</div>
               <div class="result-grid">
-                ${cnCardBlock(cnHitA)}${csCardBlock(csHitA, rawJ)}${cscdCardBlock(cdHitA, rawJ)}
+                ${cnCardBlock(cnHitA)}${csCardBlock(csHitA, rawJ)}${cscdCardBlock(cdHitA, rawJ)}${eiCardBlock(eiLkA, rawJ)}
               </div>
             </div>`);
         } else {
@@ -2415,13 +2975,14 @@ async function processPdf(file, idx = 1, total = 1) {
       const cnHitB = findCn(info.journal);
       const csHitB = findCs(info.journal);
       const cdHitB = findCscd(info.journal);
-      const edgeB = cnHitB ? '#c0392b' : (csHitB ? '#1a5c9e' : (cdHitB ? '#1e6f5c' : '#e67e22'));
+      const eiLkB = eiLookup(info.journal, info.issn);
+      const edgeB = cnHitB ? '#c0392b' : (csHitB ? '#1a5c9e' : ((eiLkB && !eiLkB.disc) ? '#9a6b12' : (cdHitB ? '#1e6f5c' : '#e67e22')));
       if (appendMode) {
         $('results').insertAdjacentHTML('beforeend',
           `<div class="result-card" style="border-left:3px solid ${edgeB};margin-bottom:12px">
-            <div class="result-title">${esc(info.journal || info.title || '未知期刊')}${cnTitleBadge(cnHitB)}${csTitleBadge(csHitB)}${cscdTitleBadge(cdHitB)}</div>
+            <div class="result-title">${esc(info.journal || info.title || '未知期刊')}${cnTitleBadge(cnHitB)}${csTitleBadge(csHitB)}${cscdTitleBadge(cdHitB)}${eiTitleBadge(eiLkB)}</div>
             <div class="result-grid">
-              ${cnCardBlock(cnHitB)}${csCardBlock(csHitB, info.journal)}${cscdCardBlock(cdHitB, info.journal)}
+              ${cnCardBlock(cnHitB)}${csCardBlock(csHitB, info.journal)}${cscdCardBlock(cdHitB, info.journal)}${eiCardBlock(eiLkB, info.journal)}
             </div>
           </div>`);
       } else {
@@ -2443,13 +3004,14 @@ async function processPdf(file, idx = 1, total = 1) {
     const cnHitC = findCn(info.journal);
     const csHitC = findCs(info.journal);
     const cdHitC = findCscd(info.journal);
-    const edgeC = cnHitC ? '#c0392b' : (csHitC ? '#1a5c9e' : (cdHitC ? '#1e6f5c' : 'var(--border)'));
+    const eiLkC = eiLookup(info.journal, info.issn);
+    const edgeC = cnHitC ? '#c0392b' : (csHitC ? '#1a5c9e' : ((eiLkC && !eiLkC.disc) ? '#9a6b12' : (cdHitC ? '#1e6f5c' : 'var(--border)')));
     if (appendMode) {
       $('results').insertAdjacentHTML('beforeend',
         `<div class="result-card" style="border-left:3px solid ${edgeC};margin-bottom:12px">
-          <div class="result-title">${esc(info.journal || info.title || '未识别期刊')}${cnTitleBadge(cnHitC)}${csTitleBadge(csHitC)}${cscdTitleBadge(cdHitC)}</div>
+          <div class="result-title">${esc(info.journal || info.title || '未识别期刊')}${cnTitleBadge(cnHitC)}${csTitleBadge(csHitC)}${cscdTitleBadge(cdHitC)}${eiTitleBadge(eiLkC)}</div>
           <div class="result-grid">
-            ${cnCardBlock(cnHitC)}${csCardBlock(csHitC, info.journal)}${cscdCardBlock(cdHitC, info.journal)}
+            ${cnCardBlock(cnHitC)}${csCardBlock(csHitC, info.journal)}${cscdCardBlock(cdHitC, info.journal)}${eiCardBlock(eiLkC, info.journal)}
           </div>
         </div>`);
     } else {
