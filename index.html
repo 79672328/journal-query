@@ -106,6 +106,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .multi-results{max-width:100%}
 .multi-results .result-card{max-width:500px;margin-left:auto;margin-right:auto}
 
+/* ===== 中文核心 (北大核心) ===== */
+.badge-cn{display:inline-block;background:#c0392b;color:#fff;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:600;margin:0 2px 0 0;vertical-align:middle}
+.badge-cn-ed{display:inline-block;background:#fdecea;color:#c0392b;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:500;margin:0 4px 0 0;vertical-align:middle}
+.cn-browse{max-height:296px;overflow-y:auto;-webkit-overflow-scrolling:touch;border:1.5px solid var(--border);border-radius:10px;background:#fff}
+.cn-disc-head{padding:7px 12px;font-size:11px;font-weight:600;color:#fff;background:var(--blue);position:sticky;top:0;z-index:1;letter-spacing:.2px}
+.cn-disc-item{padding:10px 12px;font-size:13px;color:var(--text);border-bottom:1px solid #f2f2f2;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:background .15s}
+.cn-disc-item:last-child{border-bottom:none}
+.cn-disc-item:hover{background:#f7f9fc}
+.cn-disc-item:active{background:#eef3fa}
+.cn-disc-count{font-size:11px;color:#aaa;flex-shrink:0}
+.cn-stat{font-size:11px;color:#999;text-align:center;margin-top:6px;line-height:1.5}
+.cn-tip{margin-top:12px;padding:9px 12px;background:#fdf3f2;border-radius:8px;font-size:12px;color:#a5352a;line-height:1.5}
+
 </style>
 </head>
 <body>
@@ -123,6 +136,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     <button class="mode-btn active" data-mode="name">期刊名</button>
     <button class="mode-btn" data-mode="doi">DOI</button>
     <button class="mode-btn" data-mode="pdf">PDF上传</button>
+    <button class="mode-btn" data-mode="cn">中文核心</button>
   </div>
 
   <!-- Input card -->
@@ -169,6 +183,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       </div>
       <input type="file" id="pdfInput" accept=".pdf" multiple class="hidden">
     </div>
+
+    <!-- 中文核心 (北大核心 2023) -->
+    <div id="modeCn" class="hidden">
+      <div class="input-row" style="position:relative">
+        <input type="text" id="cnInput" placeholder="输入中文期刊名，如：岩土工程学报" autocomplete="off">
+        <button id="cnClearBtn" class="hidden" style="background:#999;padding:0 14px">✕</button>
+        <button id="cnBrowseBtn" style="background:none;border:1px solid var(--border);color:var(--sub);padding:0 12px;font-size:12px;white-space:nowrap">按学科</button>
+      </div>
+      <div id="cnBrowseArea" class="cn-browse hidden" style="margin-top:8px"></div>
+      <div class="suggestions" id="cnSuggestions"></div>
+      <div class="cn-stat" id="cnStat">北大《中文核心期刊要目总览》2023年版 · 7 编 148 个学科</div>
+    </div>
   </div>
 
   <!-- Loading -->
@@ -188,7 +214,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 
   <!-- Data status -->
   <div class="stats" id="stats"></div>
-  <div class="stats" style="padding-top:0;color:#bbb">v12 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
+  <div class="stats" style="padding-top:0;color:#bbb">v13 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -219,7 +245,10 @@ const STATE = {
   total: 0,
   updated: '',
   loaded: false,
-  mode: 'name'
+  mode: 'name',
+  // 中文核心 (北大核心 2023)
+  cn: null,          // {journals, names, discs, editions, discCounts, discEd, total, version, src}
+  cnLoaded: false
 };
 
 // ==================== Data Loading ====================
@@ -240,10 +269,67 @@ async function loadData() {
     STATE.namesLower = STATE.journals.map(j => normalizeName(j[0] || ''));
     STATE.loaded = true;
     $('stats').textContent = `已加载 ${data.total.toLocaleString()} 条期刊数据 · ${data.updated}`;
+    // 中文核心库独立加载，失败不影响主库
+    loadCnData();
   } catch(e) {
     console.error('Data load error:', e);
     $('stats').textContent = '数据加载失败，请刷新重试';
     setTimeout(() => loadData(), 5000);
+  }
+}
+
+// ==================== 中文核心数据加载 ====================
+async function loadCnData() {
+  try {
+    const resp = await fetch('cn_core_data.json');
+    if (!resp.ok) throw new Error('CN data fetch failed: ' + resp.status);
+    const wrap = await resp.json();
+
+    // 数据文件外层为 {v, src, total, updated, enc:'gzip+base64', chunk, gz:[分块]}
+    // 内层 gzip 载荷含 editions / discs / journals
+    let d;
+    if (wrap.gz) {
+      const b64 = Array.isArray(wrap.gz) ? wrap.gz.join('') : wrap.gz;
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+      d = JSON.parse(await new Response(stream).text());
+    } else {
+      d = wrap;
+    }
+    const js = d.journals || [];
+
+    // 数据文件为紧凑三字段 [刊名, 学科下标, 编下标]：
+    // 学科内序号 = 该学科内出现次序；总序号 = 文档位置
+    const discEd = new Array(d.discs.length).fill(-1);
+    const discCounts = new Array(d.discs.length).fill(0);
+    const rows = js.map((j, i) => {
+      const di = j[1];
+      if (discEd[di] === -1) discEd[di] = j[2];
+      const idx = ++discCounts[di];
+      return [j[0], di, idx, j[2], i + 1];   // [刊名, 学科下标, 学科内序号, 编下标, 总序号]
+    });
+
+    STATE.cn = {
+      journals: rows,
+      names: rows.map(r => normalizeCn(r[0] || '')),
+      discs: d.discs,
+      editions: d.editions,
+      discEd: discEd,
+      discCounts: discCounts,
+      total: rows.length,
+      version: d.v,
+      src: d.src
+    };
+    STATE.cnLoaded = true;
+
+    const stat = $('cnStat');
+    if (stat) stat.textContent = `${d.src} · 共 ${rows.length.toLocaleString()} 种 · ${d.editions.length} 编 ${d.discs.length} 个学科`;
+  } catch(e) {
+    console.error('CN data load error:', e);
+    const stat = $('cnStat');
+    if (stat) stat.textContent = '中文核心数据加载失败，请刷新重试';
   }
 }
 
@@ -663,6 +749,161 @@ function showResults(matches, source = '', unknownJournal = null, append = false
   if (!append) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// ==================== 中文核心 (北大核心 2023) ====================
+// 归一化：忽略空格、括号、间隔号、连字符、点号的差异
+function normalizeCn(name) {
+  return (name || '').toLowerCase()
+    .replace(/&amp;/g, '和')
+    .replace(/[\s\u3000]+/g, '')
+    .replace(/[（）()\[\]【】〔〕]/g, '')
+    .replace(/[·・•‧.。]/g, '')
+    .replace(/[—–\-‐－_]/g, '')
+    .replace(/[：:]/g, '')
+    .replace(/[、，,／/]/g, '');
+}
+
+// 搜索：前缀命中优先，其次包含命中
+function searchCnJournals(query, limit = 40) {
+  const cn = STATE.cn;
+  if (!cn || !query) return [];
+  const q = normalizeCn(query);
+  if (!q) return [];
+  const names = cn.names, J = cn.journals;
+  const starts = [], contains = [];
+  for (let i = 0, n = J.length; i < n; i++) {
+    const p = names[i].indexOf(q);
+    if (p === 0) starts.push(J[i]);
+    else if (p > 0) contains.push(J[i]);
+    if (starts.length >= limit) break;
+  }
+  return starts.concat(contains).slice(0, limit);
+}
+
+function renderCnCard(m, extraClass = '') {
+  const cn = STATE.cn;
+  const [name, dIdx, idx, eIdx, no] = m;
+  const disc = cn.discs[dIdx] || '';
+  const ed = cn.editions[eIdx] || '';
+  const cnt = cn.discCounts[dIdx] || 0;
+
+  return `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
+    <div class="result-title">${esc(name)}</div>
+    <div class="result-issn"><span class="badge-cn">北大核心</span><span class="badge-cn-ed">2023年版</span></div>
+    <div class="result-grid">
+      <div class="result-item full">
+        <div class="label">所属学科</div>
+        <div class="value" style="font-size:16px;color:var(--text)">${esc(disc)}</div>
+      </div>
+      <div class="result-item">
+        <div class="label">学科内序号</div>
+        <div class="value" style="color:var(--text);font-size:16px">${idx}<span style="font-size:12px;color:#aaa"> / ${cnt}</span></div>
+      </div>
+      <div class="result-item">
+        <div class="label">总序号</div>
+        <div class="value" style="color:var(--text);font-size:16px">${no}<span style="font-size:12px;color:#aaa"> / ${cn.total}</span></div>
+      </div>
+      <div class="result-item full">
+        <div class="label" style="margin-bottom:2px">所属编</div>
+        <div class="value" style="font-size:12px;font-weight:400;color:var(--sub)">${esc(ed)}</div>
+      </div>
+    </div>
+    <div class="cn-tip">✅ 该刊被《中文核心期刊要目总览》(2023年版) 收录</div>
+  </div>`;
+}
+
+function showCnResults(list, source = '', query = '', append = false) {
+  const el = $('results');
+  if (!append) el.innerHTML = '';
+  $('emptyState').classList.add('hidden');
+
+  if (!list.length) {
+    if (append) return;
+    const tot = STATE.cn ? STATE.cn.total : 1987;
+    el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到「${esc(query)}」<br>2023 版北大核心共收录 ${tot} 种中文期刊<br><span style="font-size:12px;color:#aaa">可尝试期刊简称，如"岩土""建筑结构"</span></div></div>`;
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  if (source) {
+    const s = document.createElement('div');
+    s.style.cssText = 'font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.5';
+    s.innerHTML = source;
+    frag.appendChild(s);
+  }
+  if (list.length > 1) {
+    const c = document.createElement('div');
+    c.style.cssText = 'text-align:center;font-size:11px;color:#aaa;margin-bottom:8px';
+    c.textContent = `共 ${list.length} 种`;
+    frag.appendChild(c);
+  }
+
+  const MAX = 30;
+  const wrap = document.createElement('div');
+  list.slice(0, MAX).forEach(m => { wrap.innerHTML += renderCnCard(m); });
+  frag.appendChild(wrap);
+
+  if (list.length > MAX) {
+    const btnDiv = document.createElement('div');
+    btnDiv.style.cssText = 'text-align:center;padding:8px';
+    btnDiv.innerHTML = `<button onclick="this.remove();document.querySelectorAll('.cn-folded').forEach(el=>{el.style.display='';el.style.animation='fadeIn .3s ease'})"
+      style="background:none;border:1px solid #c0392b;color:#c0392b;padding:8px 24px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit">
+      显示全部 ${list.length} 种</button>`;
+    frag.appendChild(btnDiv);
+    const hw = document.createElement('div');
+    for (let i = MAX; i < list.length; i++) hw.innerHTML += renderCnCard(list[i], 'cn-folded');
+    frag.appendChild(hw);
+  }
+
+  el.appendChild(frag);
+  if (!append) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showCnSuggestions(list) {
+  const el = $('cnSuggestions');
+  if (!list.length) { el.classList.remove('show'); el.innerHTML = ''; return; }
+  const cn = STATE.cn;
+  el.innerHTML = list.map((j, i) => {
+    const disc = cn ? (cn.discs[j[1]] || '') : '';
+    return `<div class="sug-item" data-idx="${i}">
+      <div class="sug-name">${esc(j[0])}</div>
+      <div class="sug-meta"><span class="badge-cn">北大核心</span><span style="color:#888;font-size:11px">${esc(disc)}</span></div>
+    </div>`;
+  }).join('');
+  el.classList.add('show');
+}
+
+// 按学科浏览：7 编分组，148 个学科
+function renderCnBrowse() {
+  const area = $('cnBrowseArea');
+  const cn = STATE.cn;
+  if (!cn) { area.innerHTML = '<div class="cn-disc-item" style="cursor:default;color:#999">数据加载中…</div>'; return; }
+  if (area.dataset.rendered === '1') return;
+  let h = '';
+  cn.editions.forEach((ed, ei) => {
+    let inner = '';
+    cn.discs.forEach((dn, di) => {
+      if (cn.discEd[di] !== ei) return;
+      inner += `<div class="cn-disc-item" data-disc="${di}">
+        <span>${esc(dn)}</span><span class="cn-disc-count">${cn.discCounts[di]} 种</span>
+      </div>`;
+    });
+    if (inner) h += `<div class="cn-disc-head">${esc(ed)}</div>` + inner;
+  });
+  area.innerHTML = h;
+  area.dataset.rendered = '1';
+}
+
+function showCnDisc(di) {
+  const cn = STATE.cn;
+  if (!cn) return;
+  const list = cn.journals.filter(j => j[1] === di);
+  const ed = cn.editions[cn.discEd[di]] || '';
+  const source = `📚 <b>${esc(cn.discs[di])}</b> · 共 ${list.length} 种<br><span style="color:#aaa">${esc(ed)}</span>`;
+  $('cnBrowseArea').classList.add('hidden');
+  $('cnSuggestions').classList.remove('show');
+  showCnResults(list, source);
+}
+
 // ==================== Event Handlers ====================
 // Mode switching
 $$('.mode-btn').forEach(btn => {
@@ -670,7 +911,7 @@ $$('.mode-btn').forEach(btn => {
     STATE.mode = btn.dataset.mode;
     $$('.mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['modeName','modeDoi','modePdf'].forEach(id => $(id).classList.add('hidden'));
+    ['modeName','modeDoi','modePdf','modeCn'].forEach(id => $(id).classList.add('hidden'));
     $(`mode${STATE.mode.charAt(0).toUpperCase() + STATE.mode.slice(1)}`).classList.remove('hidden');
     $('suggestions').classList.remove('show');
     $('results').innerHTML = '';
@@ -678,6 +919,11 @@ $$('.mode-btn').forEach(btn => {
     // Auto-focus input for each mode
     if (STATE.mode === 'name') $('nameInput').focus();
     if (STATE.mode === 'doi') { $('doiInput').focus(); checkClipboard(); }
+    if (STATE.mode === 'cn') {
+      $('cnSuggestions').classList.remove('show');
+      $('cnInput').focus();
+      if (!STATE.cnLoaded && $('cnStat')) $('cnStat').textContent = '中文核心数据加载中…';
+    }
   });
 });
 
@@ -771,6 +1017,97 @@ $('suggestions').addEventListener('click', function(e) {
     if (suggResults[idx]) {
       showResults([suggResults[idx]]);
     }
+    this.classList.remove('show');
+  }
+});
+
+// ==================== 中文核心 交互 ====================
+let cnSuggResults = [];
+let cnSuggIndex = -1;
+
+$('cnInput').addEventListener('input', debounce(function() {
+  const q = this.value.trim();
+  $('cnClearBtn').classList.toggle('hidden', !q);
+  if (!q) {
+    $('cnSuggestions').classList.remove('show');
+    cnSuggIndex = -1;
+    return;
+  }
+  if (!STATE.cnLoaded) return;
+  cnSuggResults = searchCnJournals(q, 12);
+  cnSuggIndex = -1;
+  showCnSuggestions(cnSuggResults);
+}, 120));
+
+$('cnInput').addEventListener('keydown', function(e) {
+  const sugEl = $('cnSuggestions');
+  const items = sugEl.querySelectorAll('.sug-item');
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (sugEl.classList.contains('show') && items.length) {
+      cnSuggIndex = Math.min(cnSuggIndex + 1, items.length - 1);
+      items.forEach((el, i) => el.classList.toggle('sug-active', i === cnSuggIndex));
+      items[cnSuggIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+    return;
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (sugEl.classList.contains('show') && items.length) {
+      cnSuggIndex = Math.max(cnSuggIndex - 1, 0);
+      items.forEach((el, i) => el.classList.toggle('sug-active', i === cnSuggIndex));
+      items[cnSuggIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+    return;
+  }
+  if (e.key === 'Enter') {
+    if (sugEl.classList.contains('show') && cnSuggIndex >= 0 && cnSuggResults[cnSuggIndex]) {
+      e.preventDefault();
+      showCnResults([cnSuggResults[cnSuggIndex]]);
+      sugEl.classList.remove('show');
+      return;
+    }
+    const q = this.value.trim();
+    if (!q) return;
+    if (!STATE.cnLoaded) { showToast('中文核心数据加载中，请稍候'); return; }
+    const res = searchCnJournals(q, 200);
+    showCnResults(res, res.length ? `🔍 <b>${esc(q)}</b> · 北大核心 2023 版` : '', q);
+    sugEl.classList.remove('show');
+  }
+});
+
+$('cnClearBtn').addEventListener('click', () => {
+  $('cnInput').value = '';
+  $('cnClearBtn').classList.add('hidden');
+  $('cnSuggestions').classList.remove('show');
+  $('cnBrowseArea').classList.add('hidden');
+  const bb = $('cnBrowseBtn');
+  if (bb) bb.textContent = '按学科';
+  $('results').innerHTML = '';
+  $('emptyState').classList.remove('hidden');
+});
+
+$('cnBrowseBtn').addEventListener('click', () => {
+  const area = $('cnBrowseArea');
+  const willShow = area.classList.contains('hidden');
+  renderCnBrowse();
+  area.classList.toggle('hidden', !willShow);
+  $('cnSuggestions').classList.remove('show');
+  $('cnBrowseBtn').textContent = willShow ? '收起' : '按学科';
+});
+
+$('cnBrowseArea').addEventListener('click', e => {
+  const item = e.target.closest('.cn-disc-item');
+  if (!item || item.dataset.disc === undefined) return;
+  showCnDisc(parseInt(item.dataset.disc, 10));
+});
+
+$('cnSuggestions').addEventListener('click', function(e) {
+  const item = e.target.closest('.sug-item');
+  if (item) {
+    const idx = parseInt(item.dataset.idx, 10);
+    if (cnSuggResults[idx]) showCnResults([cnSuggResults[idx]]);
     this.classList.remove('show');
   }
 });
@@ -1048,11 +1385,17 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#modeName')) {
     $('suggestions').classList.remove('show');
   }
+  if (!e.target.closest('#modeCn')) {
+    $('cnSuggestions').classList.remove('show');
+  }
 });
 
 // Keyboard dismiss
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') $('suggestions').classList.remove('show');
+  if (e.key === 'Escape') {
+    $('suggestions').classList.remove('show');
+    $('cnSuggestions').classList.remove('show');
+  }
 });
 
 // ==================== Init ====================
