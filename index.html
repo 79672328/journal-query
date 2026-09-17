@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="description" content="新锐期刊分区查询工具，支持期刊名搜索、DOI查询、PDF上传三种方式，快速获取影响因子和新锐分区。">
+<meta name="description" content="新锐期刊分区查询工具，支持期刊名搜索、DOI查询、PDF上传三种方式，一次给出新锐分区、JCR分区、影响因子与北大中文核心收录情况。">
 <meta name="theme-color" content="#1a73e8">
 <link rel="preconnect" href="https://api.crossref.org">
 <link rel="preconnect" href="https://cdnjs.cloudflare.com">
@@ -127,7 +127,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     <div class="header-icon">JQ</div>
     <div>
       <h1>新锐期刊分区查询</h1>
-      <div class="sub">影响因子 &middot; 新锐分区 &middot; 2026</div>
+      <div class="sub">影响因子 &middot; 新锐分区 &middot; 中文核心 &middot; 2026</div>
     </div>
   </div>
 
@@ -172,7 +172,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <div class="upload-area" id="uploadArea">
         <div class="icon">📄</div>
         <div class="text" id="uploadText">点击或拖拽上传PDF</div>
-        <div class="hint">自动提取期刊信息，支持80MB内PDF，可多选</div>
+        <div class="hint">自动提取期刊信息，支持80MB内PDF，可多选<br>结果同时给出新锐分区、JCR分区与中文核心收录情况</div>
       </div>
       <div id="wxUpload" style="display:none;margin-top:10px">
         <div style="text-align:center;font-size:11px;color:#999;margin-bottom:8px">— 微信用户推荐 —</div>
@@ -214,7 +214,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 
   <!-- Data status -->
   <div class="stats" id="stats"></div>
-  <div class="stats" style="padding-top:0;color:#bbb">v13 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
+  <div class="stats" style="padding-top:0;color:#bbb">v15 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -322,10 +322,25 @@ async function loadCnData() {
       version: d.v,
       src: d.src
     };
+
+    // 名称索引：归一化刊名 -> 条目，供 PDF / DOI / 刊名搜索等模式联查中文核心
+    STATE.cn.cnMap = new Map();
+    rows.forEach(r => {
+      const k = normalizeCn(r[0] || '');
+      if (k && !STATE.cn.cnMap.has(k)) STATE.cn.cnMap.set(k, r);
+    });
     STATE.cnLoaded = true;
 
     const stat = $('cnStat');
     if (stat) stat.textContent = `${d.src} · 共 ${rows.length.toLocaleString()} 种 · ${d.editions.length} 编 ${d.discs.length} 个学科`;
+
+    // 时序保护：中文核心数据可能比用户的 PDF/DOI 查询晚到。
+    // 若结果区已有内容且当时不带中文核心，用新数据重绘一次。
+    if (STATE.lastResults && $('results') && $('results').innerHTML.trim()) {
+      const lr = STATE.lastResults;
+      STATE.lastResults = null;   // 防重入
+      showResults(lr.matches, lr.source, lr.unknownJournal);
+    }
   } catch(e) {
     console.error('CN data load error:', e);
     const stat = $('cnStat');
@@ -556,18 +571,29 @@ async function parsePdf(file) {
   try {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     const buf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    // 中文期刊 PDF 的正文常用 GBK-EUC-H 等 CJK 编码嵌入，不提供 CMap 就解不出文字层
+    // （getTextContent() 返回空），中文论文便完全无法识别刊名。
+    // cdnjs 不含 cmaps 资源（403），改用 jsdelivr 上同版本的包。
+    const pdf = await pdfjsLib.getDocument({
+      data: buf,
+      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+      cMapPacked: true
+    }).promise;
     const meta = await pdf.getMetadata();
     const info = meta.info || {};
     
-    // Extract DOI from various possible fields
-    let doi = info.DOI || info.doi || '';
-    if (!doi) {
-      // Try to find DOI in first page text
+    // 首页正文：既用于兜底找 DOI，也用于中文核心刊名反向定位
+    let firstPageText = '';
+    try {
       const page = await pdf.getPage(1);
       const text = await page.getTextContent();
-      const fullText = text.items.map(t => t.str).join(' ');
-      const doiMatch = fullText.match(/10\.\d{4,}\/[\w.\-+/()]+/i);
+      firstPageText = text.items.map(t => t.str).join(' ');
+    } catch(e) { /* 首页文本拿不到不影响主流程 */ }
+
+    // Extract DOI from various possible fields
+    let doi = info.DOI || info.doi || '';
+    if (!doi && firstPageText) {
+      const doiMatch = firstPageText.match(/10\.\d{4,}\/[\w.\-+/()]+/i);
       if (doiMatch) doi = doiMatch[0];
     }
     
@@ -595,7 +621,8 @@ async function parsePdf(file) {
       title: info.Title || '',
       journal: journal,
       issn: info.ISSN || '',
-      doi: doi || ''
+      doi: doi || '',
+      firstPageText: firstPageText
     };
   } catch(e) {
     console.error('PDF parse error:', e);
@@ -606,13 +633,14 @@ async function parsePdf(file) {
 // ==================== Render ====================
 function renderCard(m, extraClass = '') {
   const [name, issn, jif, jcrQ, xrCat, xrQ, wosIdx, wosSubj] = m;
+  const cnHit = findCn(name);          // 中文核心联查（数据未就绪时返回 null）
   const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
   const jcrColorClass = jcrQ ? 'badge-' + jcrQ.toLowerCase() : '';
   const wosBadge = wosIdx ? wosIdx.split(' | ').map(i => `<span style="display:inline-block;background:#e8f5e9;color:#2e7d32;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;margin:0 2px">${i}</span>`).join('') : '';
   const wosSubjShort = wosSubj ? wosSubj.split(' | ').slice(0, 3).join(' · ') : '';
   
   let h = `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
-    <div class="result-title">${esc(name)}</div>
+    <div class="result-title">${esc(name)}${cnTitleBadge(cnHit)}</div>
     <div class="result-issn">${issn ? 'ISSN ' + issn : ''}${wosBadge ? '  ' + wosBadge : ''}</div>
     <div class="result-grid">`;
   if (xrCat || xrQ) {
@@ -637,6 +665,7 @@ function renderCard(m, extraClass = '') {
       <div class="label">影响因子</div>
       <div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div>
     </div>`;
+  h += cnCardBlock(cnHit);
   if (wosSubjShort) {
     h += `<div class="result-item full" style="padding:8px 12px;text-align:left">
       <div class="label" style="margin-bottom:2px">WoS学科</div>
@@ -650,6 +679,9 @@ function renderCard(m, extraClass = '') {
 function showResults(matches, source = '', unknownJournal = null, append = false) {
   const el = $('results');
 
+  // 记下本次查询参数，供中文核心数据晚到时重绘
+  if (!append) STATE.lastResults = { matches, source, unknownJournal };
+
   // In append mode (multi-PDF), skip if no results to avoid noise
   if (append && !matches.length && !unknownJournal) return;
   if (!append) el.innerHTML = '';
@@ -657,12 +689,14 @@ function showResults(matches, source = '', unknownJournal = null, append = false
   // Case: no matches in database, but we identified a journal via CrossRef
   if (!matches.length && unknownJournal) {
     $('emptyState').classList.add('hidden');
-    const jn = esc(unknownJournal.journal || unknownJournal.name || '');
+    const rawName = unknownJournal.journal || unknownJournal.name || '';
+    const jn = esc(rawName);
     const title = esc(unknownJournal.title || '');
     const doi = esc(unknownJournal.doi || '');
+    const cnHit = findCn(rawName);
     
-    let html = `<div class="result-card" style="border-left:3px solid #e67e22">
-      <div class="result-title">${jn || '未知期刊'}</div>
+    let html = `<div class="result-card" style="border-left:3px solid ${cnHit ? '#c0392b' : '#e67e22'}">
+      <div class="result-title">${jn || '未知期刊'}${cnTitleBadge(cnHit)}</div>
       <div class="result-issn">${doi ? 'DOI: ' + doi : ''}</div>`;
     if (title) html += `<div style="font-size:12px;color:var(--sub);margin-bottom:12px;line-height:1.4">${title}</div>`;
     
@@ -679,9 +713,12 @@ function showResults(matches, source = '', unknownJournal = null, append = false
         <div class="label">影响因子</div>
         <div class="value" style="font-size:14px;color:var(--sub)">-</div>
       </div>
+      ${cnCardBlock(cnHit)}
     </div>
-    <div style="margin-top:12px;padding:8px 10px;background:#fef9f0;border-radius:8px;font-size:12px;color:#b87333;line-height:1.5">
-      该期刊暂未被新锐分区数据库收录。可能是新创期刊或尚未被索引。
+    <div style="margin-top:12px;padding:8px 10px;background:${cnHit ? '#fdf3f2' : '#fef9f0'};border-radius:8px;font-size:12px;color:${cnHit ? '#c0392b' : '#b87333'};line-height:1.5">
+      ${cnHit
+        ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区），但属于《中文核心期刊要目总览》(2023年版) 收录期刊 —— 投稿或成果认定时可按北大核心口径使用。`
+        : '该期刊暂未被新锐分区数据库收录。可能是新创期刊或尚未被索引。'}
     </div></div>`;
     
     if (source) {
@@ -760,6 +797,151 @@ function normalizeCn(name) {
     .replace(/[—–\-‐－_]/g, '')
     .replace(/[：:]/g, '')
     .replace(/[、，,／/]/g, '');
+}
+
+// 按刊名在中文核心库中联查。命中返回条目 [刊名, 学科下标, 学科内序号, 编下标, 总序号]，否则 null。
+// 匹配分三级，逐级放宽，但每级都设了防误判门槛（宁可返回 null 也不给错刊）。
+function findCn(name) {
+  const cn = STATE.cn;
+  if (!cn || !cn.cnMap || !name) return null;
+  const raw = String(name);
+  const key = normalizeCn(raw);
+  if (!key) return null;
+
+  // 1) 归一化后精确匹配
+  const hit = cn.cnMap.get(key);
+  if (hit) return hit;
+
+  // 2) 剥掉尾部括号补充说明（如「（中文版）」「(网络版)」）后精确匹配
+  const stripped = normalizeCn(raw.replace(/[（(【\[][^）)】\]]{1,24}[）)】\]]/g, ''));
+  if (stripped && stripped !== key) {
+    const h2 = cn.cnMap.get(stripped);
+    if (h2) return h2;
+  }
+
+  // 3) 前缀级匹配。PDF 提取的刊名要么被截断（是完整刊名的前缀），
+  //    要么带尾部残留（完整刊名 + 期号/年份/副标题）。两种都只认前缀关系，
+  //    不做任意位置包含 —— 否则「土木与环境工程学报」会歧义到「环境工程学报」。
+  if (key.length < 4) return null;
+  const names = cn.names, J = cn.journals;
+
+  // 3a) 库中刊名以查询串开头：要求唯一，多了说明查询串不完整 → 不认
+  let cand = null, n = 0;
+  for (let i = 0, len = names.length; i < len; i++) {
+    const nm = names[i];
+    if (!nm || nm.length < 4) continue;
+    if (nm.startsWith(key)) { cand = J[i]; if (++n > 1) return null; }
+  }
+  if (n === 1) return cand;
+
+  // 3b) 查询串以库中刊名开头（尾部有残留）：取最长匹配，并列则不认
+  let best = null, bestLen = 0, tie = false;
+  for (let i = 0, len = names.length; i < len; i++) {
+    const nm = names[i];
+    if (!nm || nm.length < 4) continue;
+    if (key.startsWith(nm)) {
+      if (nm.length > bestLen) { best = J[i]; bestLen = nm.length; tie = false; }
+      else if (nm.length === bestLen) tie = true;
+    }
+  }
+  return (best && !tie) ? best : null;
+}
+
+// 卡片内的中文核心信息块（PDF / DOI / 刊名搜索共用）
+function cnCardBlock(cnHit) {
+  if (!STATE.cn) return '';   // 数据未就绪时不显示，避免误报「未收录」
+  if (!cnHit) {
+    return `<div class="result-item full" style="padding:8px 12px;text-align:left">
+      <div class="label" style="margin-bottom:2px">中文核心</div>
+      <div class="value" style="font-size:12px;font-weight:400;color:#bbb">未收录（非北大中文核心）</div>
+    </div>`;
+  }
+  const disc = STATE.cn.discs[cnHit[1]] || '';
+  const cnt = STATE.cn.discCounts[cnHit[1]] || 0;
+  const ed = STATE.cn.editions[cnHit[3]] || '';
+  return `<div class="result-item full" style="padding:9px 12px;text-align:left;background:#fdf3f2;border-radius:8px">
+      <div class="label" style="margin-bottom:3px">中文核心</div>
+      <div class="value" style="font-size:14px;font-weight:700;color:#c0392b">✅ 北大核心 2023年版 · ${esc(disc)}</div>
+      <div style="font-size:11px;color:#a98c88;margin-top:3px;font-weight:400">
+        学科内序号 ${cnHit[2]} / ${cnt} &nbsp;·&nbsp; 总序号 ${cnHit[4]} / ${STATE.cn.total} &nbsp;·&nbsp; ${esc(ed)}
+      </div>
+    </div>`;
+}
+
+// 标题旁的徽标
+function cnTitleBadge(cnHit) {
+  return cnHit ? '<span class="badge-cn" style="font-size:10px;padding:2px 6px;margin-left:6px">北大核心</span>' : '';
+}
+
+// 中文核心刊名反向定位。
+// 中文期刊 PDF 普遍不带出版社元数据（journal 字段为空，或是「OCR-PDF」这类软件名），
+// 仅靠元数据识别不了。这里用 1987 条刊名表去首页正文里扫，取出现位置最靠前的那个 ——
+// 中文期刊的刊名一般在页眉/篇首，而参考文献在文末，position 最靠前的最可能就是它。
+function cnFindInText(text) {
+  const cn = STATE.cn;
+  if (!cn || !cn.names || !text) return null;
+  const norm = normalizeCn(text);
+  if (norm.length < 6) return null;
+
+  // 只在给定范围内找。requireUnique=true 时要求全范围只有一本刊命中，
+  // 否则说明正文里顺带提了别的刊物，结论不可靠。
+  const scan = (scope, requireUnique) => {
+    let best = null, bestPos = Infinity, bestLen = -1, count = 0;
+    const names = cn.names, J = cn.journals;
+    for (let i = 0, n = names.length; i < n; i++) {
+      const nm = names[i];
+      // 少于 4 字的刊名（如「混凝土」）是正文里的高频词，命中无意义，直接排除
+      if (!nm || nm.length < 4) continue;
+      const p = scope.indexOf(nm);
+      if (p < 0) continue;
+      if (requireUnique) {
+        if (++count > 1) return null;
+        best = J[i];
+        continue;
+      }
+      if (p < bestPos || (p === bestPos && nm.length > bestLen)) {
+        best = J[i]; bestPos = p; bestLen = nm.length;
+      }
+    }
+    return best;
+  };
+
+  // 第一轮：篇首 400 字内取最靠前的——中文期刊刊名一般就在页眉。
+  // 第二轮：仍无果才放开到全文，但必须唯一命中。
+  return scan(norm.slice(0, 400), false) || scan(norm, true);
+}
+
+// 正文兜底识别。命中则直接出结果并返回 true；未命中返回 false，交回原流程。
+function cnTextFallback(info, source, appendMode) {
+  if (!info || !info.firstPageText || !STATE.cn) return false;
+  const hit = cnFindInText(info.firstPageText);
+  if (!hit) return false;
+  const nm = hit[0];
+  const srcX = `PDF正文识别: ${esc(nm)}`;
+  const mX = searchJournals(nm);
+
+  if (mX.length) {                       // 新锐库里也有 → 正常卡片（已含中文核心块）
+    if (info.title) source += `<br>${esc(info.title)}`;
+    if (appendMode) {
+      $('results').insertAdjacentHTML('beforeend',
+        `<div style="font-size:11px;color:#aaa;padding:4px 0 8px">${srcX}</div>` + mX.map(m => renderCard(m)).join(''));
+    } else {
+      showResults(mX, srcX);
+    }
+    return true;
+  }
+
+  // 新锐库里没有，但中文核心有 → 直接出中文核心卡片，避免误报「未收录」
+  if (appendMode) {
+    $('results').insertAdjacentHTML('beforeend',
+      `<div class="result-card" style="border-left:3px solid #c0392b;margin-bottom:12px">
+        <div class="result-title">${esc(nm)}${cnTitleBadge(hit)}</div>
+        <div class="result-grid">${cnCardBlock(hit)}</div>
+      </div>`);
+  } else {
+    showResults([], srcX, { journal: nm, title: info.title });
+  }
+  return true;
 }
 
 // 搜索：前缀命中优先，其次包含命中
@@ -1234,6 +1416,9 @@ async function processPdf(file, idx = 1, total = 1) {
   hideLoading();
   
   if (!info || (!info.journal && !info.doi && !info.issn)) {
+    // 中文期刊 PDF 常常既无元数据也无 DOI。先让中文核心库用刊名表在首页正文里反向定位，
+    // 认出来了就正常出结果，不再直接判定「无元数据」。
+    if (info && cnTextFallback(info, '', appendMode)) return;
     if (appendMode) {
       showToast(`${file.name.substring(0,30)} 无元数据`);
     } else {
@@ -1288,11 +1473,14 @@ async function processPdf(file, idx = 1, total = 1) {
       if (!matches.length) {
         if (appendMode) {
           // Fast append for multi-PDF: skip showResults flow
-          const cn = crossrefInfo.journal || crossrefInfo.title || '未知期刊';
+          const rawJ = crossrefInfo.journal || crossrefInfo.title || '未知期刊';
+          const cnHitA = findCn(crossrefInfo.journal || '');
           $('results').insertAdjacentHTML('beforeend',
-            `<div class="result-card" style="border-left:3px solid #e67e22;margin-bottom:12px">
-              <div class="result-title">${esc(cn)}</div>
-              <div style="font-size:12px;color:#e67e22;text-align:center;padding:8px">暂未收录</div>
+            `<div class="result-card" style="border-left:3px solid ${cnHitA ? '#c0392b' : '#e67e22'};margin-bottom:12px">
+              <div class="result-title">${esc(rawJ)}${cnTitleBadge(cnHitA)}</div>
+              <div class="result-grid">
+                ${cnHitA ? cnCardBlock(cnHitA) : '<div style="font-size:12px;color:#e67e22;text-align:center;padding:8px">暂未收录</div>'}
+              </div>
             </div>`);
         } else {
           showResults([], source, crossrefInfo);
@@ -1307,11 +1495,16 @@ async function processPdf(file, idx = 1, total = 1) {
     source = `PDF提取: ${esc(info.journal)}`;
     matches = searchJournals(info.journal);
     if (!matches.length) {
+      // 元数据刊名不可信（可能是「OCR-PDF」这类软件名）→ 先试中文核心正文反向定位
+      if (cnTextFallback(info, source, appendMode)) return;
+      const cnHitB = findCn(info.journal);
       if (appendMode) {
         $('results').insertAdjacentHTML('beforeend',
-          `<div class="result-card" style="border-left:3px solid #e67e22;margin-bottom:12px">
-            <div class="result-title">${esc(info.journal || info.title || '未知期刊')}</div>
-            <div style="font-size:12px;color:#e67e22;text-align:center;padding:8px">暂未收录</div>
+          `<div class="result-card" style="border-left:3px solid ${cnHitB ? '#c0392b' : '#e67e22'};margin-bottom:12px">
+            <div class="result-title">${esc(info.journal || info.title || '未知期刊')}${cnTitleBadge(cnHitB)}</div>
+            <div class="result-grid">
+              ${cnHitB ? cnCardBlock(cnHitB) : '<div style="font-size:12px;color:#e67e22;text-align:center;padding:8px">暂未收录</div>'}
+            </div>
           </div>`);
       } else {
         showResults([], source, { journal: info.journal, title: info.title, doi: info.doi });
@@ -1320,17 +1513,23 @@ async function processPdf(file, idx = 1, total = 1) {
     }
   }
   
+  // 元数据里没有刊名（中文期刊 PDF 常态）→ 中文核心正文兜底
+  if (!matches.length && cnTextFallback(info, source, appendMode)) return;
+
   if (!matches.length && info.issn) {
     matches = searchJournals(info.issn);
     source += ` (ISSN: ${info.issn})`;
   }
   
   if (!matches.length) {
+    const cnHitC = findCn(info.journal);
     if (appendMode) {
       $('results').insertAdjacentHTML('beforeend',
-        `<div class="result-card" style="margin-bottom:12px">
-          <div class="result-title">${esc(info.journal || info.title || '未识别期刊')}</div>
-          <div style="font-size:12px;color:var(--sub);text-align:center;padding:8px">未能匹配到数据库</div>
+        `<div class="result-card" style="border-left:3px solid ${cnHitC ? '#c0392b' : 'var(--border)'};margin-bottom:12px">
+          <div class="result-title">${esc(info.journal || info.title || '未识别期刊')}${cnTitleBadge(cnHitC)}</div>
+          <div class="result-grid">
+            ${cnHitC ? cnCardBlock(cnHitC) : '<div style="font-size:12px;color:var(--sub);text-align:center;padding:8px">未能匹配到数据库</div>'}
+          </div>
         </div>`);
     } else {
       showResults([], source, info);
