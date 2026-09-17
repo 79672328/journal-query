@@ -1,6 +1,6 @@
 // Service Worker — network-first for code, cache-first for assets
 // Bumping VERSION forces cache refresh on next page load
-const VERSION = '16';
+const VERSION = '18';
 const CACHE = 'jq-v1.' + VERSION;
 
 // Static assets that never change between deploys (cached)
@@ -39,7 +39,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   // Network-first data-like files with cache fallback
-  if (url.includes('journal_data.json.gz') || url.includes('cn_core_data.json') || url.includes('api.crossref.org')) {
+  if (url.includes('journal_data.json.gz') || url.includes('cn_core_data.json') || url.includes('cssci_data.json') || url.includes('api.crossref.org')) {
     e.respondWith(
       fetch(e.request).then(resp => {
         if (resp.ok) {

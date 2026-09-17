@@ -119,6 +119,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .cn-stat{font-size:11px;color:#999;text-align:center;margin-top:6px;line-height:1.5}
 .cn-tip{margin-top:12px;padding:9px 12px;background:#fdf3f2;border-radius:8px;font-size:12px;color:#a5352a;line-height:1.5}
 
+/* ===== 南大核心 (CSSCI) ===== */
+.badge-cs{display:inline-block;background:#1a5c9e;color:#fff;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:600;margin:0 2px 0 0;vertical-align:middle}
+.badge-cs-ext{display:inline-block;background:#e8f1fa;color:#1a5c9e;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:500;margin:0 4px 0 0;vertical-align:middle}
+.cn-disc-head.cs{background:#1a5c9e}
+.cn-tip.cs{background:#eef4fb;color:#1a5c9e}
+.lib-switch{display:flex;gap:6px;margin-bottom:8px}
+.lib-switch button{flex:1;padding:7px 4px;font-size:12px;border:1.5px solid var(--border);background:#fff;border-radius:8px;color:var(--sub);cursor:pointer;font-family:inherit;white-space:nowrap}
+.lib-switch button.active{border-color:#1a5c9e;color:#1a5c9e;background:#eef4fb;font-weight:600}
+
 </style>
 </head>
 <body>
@@ -127,7 +136,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     <div class="header-icon">JQ</div>
     <div>
       <h1>新锐期刊分区查询</h1>
-      <div class="sub">影响因子 &middot; 新锐分区 &middot; 中文核心 &middot; 2026</div>
+      <div class="sub">影响因子 &middot; 新锐分区 &middot; 北大核心 &middot; 南大核心 CSSCI &middot; 2026</div>
     </div>
   </div>
 
@@ -136,7 +145,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     <button class="mode-btn active" data-mode="name">期刊名</button>
     <button class="mode-btn" data-mode="doi">DOI</button>
     <button class="mode-btn" data-mode="pdf">PDF上传</button>
-    <button class="mode-btn" data-mode="cn">中文核心</button>
+    <button class="mode-btn" data-mode="cn">中文收录</button>
   </div>
 
   <!-- Input card -->
@@ -172,7 +181,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <div class="upload-area" id="uploadArea">
         <div class="icon">📄</div>
         <div class="text" id="uploadText">点击或拖拽上传PDF</div>
-        <div class="hint">自动提取期刊信息，支持80MB内PDF，可多选<br>结果同时给出新锐分区、JCR分区与中文核心收录情况</div>
+        <div class="hint">自动提取期刊信息，支持80MB内PDF，可多选<br>结果同时给出新锐分区、JCR分区，以及北大核心 / 南大核心 CSSCI 收录情况</div>
       </div>
       <div id="wxUpload" style="display:none;margin-top:10px">
         <div style="text-align:center;font-size:11px;color:#999;margin-bottom:8px">— 微信用户推荐 —</div>
@@ -184,8 +193,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <input type="file" id="pdfInput" accept=".pdf" multiple class="hidden">
     </div>
 
-    <!-- 中文核心 (北大核心 2023) -->
+    <!-- 中文收录（北大核心 + 南大核心 CSSCI） -->
     <div id="modeCn" class="hidden">
+      <div class="lib-switch" id="libSwitch">
+        <button class="active" data-lib="cn">北大核心</button>
+        <button data-lib="cs">南大核心 CSSCI</button>
+      </div>
       <div class="input-row" style="position:relative">
         <input type="text" id="cnInput" placeholder="输入中文期刊名，如：岩土工程学报" autocomplete="off">
         <button id="cnClearBtn" class="hidden" style="background:#999;padding:0 14px">✕</button>
@@ -214,7 +227,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 
   <!-- Data status -->
   <div class="stats" id="stats"></div>
-  <div class="stats" style="padding-top:0;color:#bbb">v16 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
+  <div class="stats" style="padding-top:0;color:#bbb">v18 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -273,7 +286,11 @@ const STATE = {
   mode: 'name',
   // 中文核心 (北大核心 2023)
   cn: null,          // {journals, names, discs, editions, discCounts, discEd, total, version, src}
-  cnLoaded: false
+  cnLoaded: false,
+  // 南大核心 (CSSCI 2025-2026 来源期刊 + 扩展版)
+  cs: null,          // {journals, names, discs, libs, discCounts, total, extTotal, version, src}
+  csLoaded: false,
+  cnLib: 'cn'        // 「中文收录」页当前浏览的库: cn | cs
 };
 
 // ==================== Data Loading ====================
@@ -296,11 +313,20 @@ async function loadData() {
     $('stats').textContent = `已加载 ${data.total.toLocaleString()} 条期刊数据 · ${data.updated}`;
     // 中文核心库独立加载，失败不影响主库
     loadCnData();
+    // 南大核心 CSSCI 库同样独立加载
+    loadCsData();
   } catch(e) {
     console.error('Data load error:', e);
     $('stats').textContent = '数据加载失败，请刷新重试';
     setTimeout(() => loadData(), 5000);
   }
+}
+
+// 显示层字形归一：北大库中《中国人口・资源与环境》用的是日文中点 U+30FB，
+// 与其余条目的中文间隔号 U+00B7 不一致（原数据的历史遗留）。两库都过一遍，
+// 避免同一本刊在「北大核心」页和联查块里字形不同。只影响显示，不影响匹配。
+function tidyZhName(s) {
+  return String(s || '').replace(/\u30FB/g, '\u00B7');
 }
 
 // ==================== 中文核心数据加载 ====================
@@ -333,7 +359,7 @@ async function loadCnData() {
       const di = j[1];
       if (discEd[di] === -1) discEd[di] = j[2];
       const idx = ++discCounts[di];
-      return [j[0], di, idx, j[2], i + 1];   // [刊名, 学科下标, 学科内序号, 编下标, 总序号]
+      return [tidyZhName(j[0]), di, idx, j[2], i + 1];   // [刊名, 学科下标, 学科内序号, 编下标, 总序号]
     });
 
     STATE.cn = {
@@ -355,9 +381,7 @@ async function loadCnData() {
       if (k && !STATE.cn.cnMap.has(k)) STATE.cn.cnMap.set(k, r);
     });
     STATE.cnLoaded = true;
-
-    const stat = $('cnStat');
-    if (stat) stat.textContent = `${d.src} · 共 ${rows.length.toLocaleString()} 种 · ${d.editions.length} 编 ${d.discs.length} 个学科`;
+    updateZhStat();
 
     // 时序保护：中文核心数据可能比用户的 PDF/DOI 查询晚到。
     // 若结果区已有内容且当时不带中文核心，用新数据重绘一次。
@@ -370,6 +394,94 @@ async function loadCnData() {
     console.error('CN data load error:', e);
     const stat = $('cnStat');
     if (stat) stat.textContent = '中文核心数据加载失败，请刷新重试';
+  }
+}
+
+// ==================== 南大核心 CSSCI 数据加载 ====================
+// 数据含两部分：来源期刊 674 种（核心版）+ 扩展版 261 种。
+// 前端合并成一张表，用 lib 字段区分（0=来源期刊，1=扩展版），
+// 这样 PDF 正文反向定位可以一次扫完两张表，再回头判各自归属。
+async function loadCsData() {
+  try {
+    const resp = await fetch('cssci_data.json');
+    if (!resp.ok) throw new Error('CSSCI data fetch failed: ' + resp.status);
+    const wrap = await resp.json();
+
+    let d;
+    if (wrap.gz) {
+      const b64 = Array.isArray(wrap.gz) ? wrap.gz.join('') : wrap.gz;
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+      d = JSON.parse(await new Response(stream).text());
+    } else {
+      d = wrap;
+    }
+
+    const discs = d.discs || [], extDiscs = d.extDiscs || [];
+    const discCounts = new Array(discs.length).fill(0);
+    const extDiscCounts = new Array(extDiscs.length).fill(0);
+    const rows = [];
+
+    // lib: 0=来源期刊, 1=扩展版；row = [刊名, lib, 学科下标, 学科内序号, 总序号]
+    (d.journals || []).forEach((j, i) => {
+      const di = j[1];
+      rows.push([tidyZhName(j[0]), 0, di, ++discCounts[di], i + 1]);
+    });
+    (d.ext || []).forEach((j, i) => {
+      const di = j[1];
+      rows.push([tidyZhName(j[0]), 1, di, ++extDiscCounts[di], i + 1]);
+    });
+
+    STATE.cs = {
+      journals: rows,
+      names: rows.map(r => normalizeCn(r[0] || '')),
+      discs: discs,
+      extDiscs: extDiscs,
+      libs: ['CSSCI 来源期刊', 'CSSCI 扩展版'],
+      discCounts: discCounts,
+      extDiscCounts: extDiscCounts,
+      total: (d.journals || []).length,
+      extTotal: (d.ext || []).length,
+      version: d.v,
+      src: d.src
+    };
+
+    // 名称索引。来源期刊排在前面，同名时优先归到来源期刊。
+    STATE.cs.csMap = new Map();
+    rows.forEach(r => {
+      const k = normalizeCn(r[0] || '');
+      if (k && !STATE.cs.csMap.has(k)) STATE.cs.csMap.set(k, r);
+    });
+    STATE.csLoaded = true;
+    updateZhStat();
+
+    // 时序保护：与北大核心同理，晚到时重绘已有结果
+    if (STATE.lastResults && $('results') && $('results').innerHTML.trim()) {
+      const lr = STATE.lastResults;
+      STATE.lastResults = null;
+      showResults(lr.matches, lr.source, lr.unknownJournal);
+    }
+  } catch(e) {
+    console.error('CSSCI data load error:', e);
+    updateZhStat();
+  }
+}
+
+// 「中文收录」页的库说明行，随当前库切换
+function updateZhStat() {
+  const stat = $('cnStat');
+  if (!stat) return;
+  const cn = STATE.cn, cs = STATE.cs;
+  if (STATE.cnLib === 'cs') {
+    stat.textContent = cs
+      ? `${cs.src}(${cs.version}) · 来源期刊 ${cs.total} 种 + 扩展版 ${cs.extTotal} 种 · ${cs.discs.length} 个学科`
+      : '南大核心数据加载中…';
+  } else {
+    stat.textContent = cn
+      ? `${cn.src} · 共 ${cn.total.toLocaleString()} 种 · ${cn.editions.length} 编 ${cn.discs.length} 个学科`
+      : '北大核心数据加载中…';
   }
 }
 
@@ -707,13 +819,14 @@ async function parsePdf(file) {
 function renderCard(m, extraClass = '') {
   const [name, issn, jif, jcrQ, xrCat, xrQ, wosIdx, wosSubj] = m;
   const cnHit = findCn(name);          // 中文核心联查（数据未就绪时返回 null）
+  const csHit = findCs(name);          // 南大核心联查
   const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
   const jcrColorClass = jcrQ ? 'badge-' + jcrQ.toLowerCase() : '';
   const wosBadge = wosIdx ? wosIdx.split(' | ').map(i => `<span style="display:inline-block;background:#e8f5e9;color:#2e7d32;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;margin:0 2px">${i}</span>`).join('') : '';
   const wosSubjShort = wosSubj ? wosSubj.split(' | ').slice(0, 3).join(' · ') : '';
   
   let h = `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
-    <div class="result-title">${esc(name)}${cnTitleBadge(cnHit)}</div>
+    <div class="result-title">${esc(name)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}</div>
     <div class="result-issn">${issn ? 'ISSN ' + issn : ''}${wosBadge ? '  ' + wosBadge : ''}</div>
     <div class="result-grid">`;
   if (xrCat || xrQ) {
@@ -738,7 +851,7 @@ function renderCard(m, extraClass = '') {
       <div class="label">影响因子</div>
       <div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div>
     </div>`;
-  h += cnCardBlock(cnHit);
+  h += cnCardBlock(cnHit) + csCardBlock(csHit, name);
   if (wosSubjShort) {
     h += `<div class="result-item full" style="padding:8px 12px;text-align:left">
       <div class="label" style="margin-bottom:2px">WoS学科</div>
@@ -767,9 +880,12 @@ function showResults(matches, source = '', unknownJournal = null, append = false
     const title = esc(unknownJournal.title || '');
     const doi = esc(unknownJournal.doi || '');
     const cnHit = findCn(rawName);
+    const csHit = findCs(rawName);
+    const csCand = csCandidates(rawName);
+    const zhEdge = cnHit ? '#c0392b' : ((csHit || csCand.length) ? '#1a5c9e' : '#e67e22');
     
-    let html = `<div class="result-card" style="border-left:3px solid ${cnHit ? '#c0392b' : '#e67e22'}">
-      <div class="result-title">${jn || '未知期刊'}${cnTitleBadge(cnHit)}</div>
+    let html = `<div class="result-card" style="border-left:3px solid ${zhEdge}">
+      <div class="result-title">${jn || '未知期刊'}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}</div>
       <div class="result-issn">${doi ? 'DOI: ' + doi : ''}</div>`;
     if (title) html += `<div style="font-size:12px;color:var(--sub);margin-bottom:12px;line-height:1.4">${title}</div>`;
     
@@ -786,12 +902,16 @@ function showResults(matches, source = '', unknownJournal = null, append = false
         <div class="label">影响因子</div>
         <div class="value" style="font-size:14px;color:var(--sub)">-</div>
       </div>
-      ${cnCardBlock(cnHit)}
+      ${cnCardBlock(cnHit)}${csCardBlock(csHit, rawName)}
     </div>
-    <div style="margin-top:12px;padding:8px 10px;background:${cnHit ? '#fdf3f2' : '#fef9f0'};border-radius:8px;font-size:12px;color:${cnHit ? '#c0392b' : '#b87333'};line-height:1.5">
+    <div style="margin-top:12px;padding:8px 10px;background:${cnHit ? '#fdf3f2' : ((csHit || csCand.length) ? '#eef4fb' : '#fef9f0')};border-radius:8px;font-size:12px;color:${zhEdge};line-height:1.5">
       ${cnHit
         ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区），但属于《中文核心期刊要目总览》(2023年版) 收录期刊 —— 投稿或成果认定时可按北大核心口径使用。`
-        : '该期刊暂未被新锐分区数据库收录。可能是新创期刊或尚未被索引。'}
+        : (csHit
+          ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区），但属于南大 CSSCI ${esc(STATE.cs ? STATE.cs.version : '')}${csHit[1] === 1 ? ' 扩展版' : ' 来源期刊'} —— 认定口径请以本单位规定为准。`
+          : (csCand.length
+            ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区）。南大 CSSCI 目录中有 ${csCand.length} 本同名刊（见上方），若需认定收录层级请按主办单位 / 出版地进一步区分。`
+            : '该期刊暂未被新锐分区数据库收录。可能是新创期刊或尚未被索引。'))}
     </div></div>`;
     
     if (source) {
@@ -946,48 +1066,178 @@ function cnTitleBadge(cnHit) {
   return cnHit ? '<span class="badge-cn" style="font-size:10px;padding:2px 6px;margin-left:6px">北大核心</span>' : '';
 }
 
-// 中文核心刊名反向定位。
-// 中文期刊 PDF 普遍不带出版社元数据（journal 字段为空，或是「OCR-PDF」这类软件名），
-// 仅靠元数据识别不了。这里用 1987 条刊名表去首页正文里扫，取出现位置最靠前的那个 ——
-// 中文期刊的刊名一般在页眉/篇首，而参考文献在文末，position 最靠前的最可能就是它。
-function cnFindInText(text) {
-  const cn = STATE.cn;
-  if (!cn || !cn.names || !text) return null;
+// ==================== 南大核心 (CSSCI) ====================
+// 与 findCn 同一套三级匹配策略，只是换成 CSSCI 表（来源期刊 + 扩展版）。
+// 命中返回 [刊名, lib, 学科下标, 学科内序号, 总序号]，lib 0=来源期刊 1=扩展版。
+function findCs(name) {
+  const cs = STATE.cs;
+  if (!cs || !cs.csMap || !name) return null;
+  const raw = String(name);
+  const key = normalizeCn(raw);
+  if (!key) return null;
 
-  // 只在给定范围内找。requireUnique=true 时要求全范围只有一本刊命中，
-  // 否则说明这段文字里顺带提了别的刊物，结论不可靠。
+  const hit = cs.csMap.get(key);
+  if (hit) return hit;
+
+  const stripped = normalizeCn(raw.replace(/[（(【\[][^）)】\]]{1,24}[）)】\]]/g, ''));
+  if (stripped && stripped !== key) {
+    const h2 = cs.csMap.get(stripped);
+    if (h2) return h2;
+  }
+
+  if (key.length < 4) return null;
+  const names = cs.names, J = cs.journals;
+
+  let cand = null, n = 0;
+  for (let i = 0, len = names.length; i < len; i++) {
+    const nm = names[i];
+    if (!nm || nm.length < 4) continue;
+    if (nm.startsWith(key)) { cand = J[i]; if (++n > 1) return null; }
+  }
+  if (n === 1) return cand;
+
+  let best = null, bestLen = 0, tie = false;
+  for (let i = 0, len = names.length; i < len; i++) {
+    const nm = names[i];
+    if (!nm || nm.length < 4) continue;
+    if (key.startsWith(nm)) {
+      if (nm.length > bestLen) { best = J[i]; bestLen = nm.length; tie = false; }
+      else if (nm.length === bestLen) tie = true;
+    }
+  }
+  return (best && !tie) ? best : null;
+}
+
+// CSSCI 目录用尾部括号区分同名刊（如「地理学报(北京)」「地理学报(台湾)」，935 种中 140 种带括号）。
+// 只写基名时前缀匹配会命中多本 → findCs 返回 null。此时不能报「未收录」（属事实性误报），
+// 要列出同名候选让人自行区分。仅当括号紧跟基名、即查询串恰为完整基名时才认，避免误伤真歧义。
+function csCandidates(name) {
+  const cs = STATE.cs;
+  if (!cs || !cs.csMap || !name) return [];
+  const raw = String(name).trim();
+  const key = normalizeCn(raw);
+  if (!key || key.length < 4) return [];
+  if (cs.csMap.get(key)) return [];          // 已能精确命中，无需候选
+  const out = [];
+  for (let i = 0, len = cs.journals.length; i < len; i++) {
+    const full = (cs.journals[i][0] || '').trim();
+    if (!full.startsWith(raw)) continue;
+    const rest = full.slice(raw.length).trim();
+    if (!rest || !/^[（(【\[]/.test(rest)) continue;   // 括号必须紧接基名
+    out.push(cs.journals[i]);
+  }
+  return out.length > 1 ? out : [];
+}
+
+// 卡片内的南大核心信息块（PDF / DOI / 刊名搜索共用）
+function csCardBlock(csHit, name) {
+  if (!STATE.cs) return '';   // 数据未就绪时不显示，避免误报「未收录」
+  if (!csHit) {
+    const cands = csCandidates(name);
+    if (cands.length) {
+      const cs = STATE.cs;
+      const list = cands.map(r => {
+        const isExt = r[1] === 1;
+        const disc = isExt ? (cs.extDiscs[r[2]] || '') : (cs.discs[r[2]] || '');
+        return `<div style="margin-top:3px">· <b>${esc(r[0])}</b> —— ${isExt ? 'CSSCI 扩展版' : '南大核心'} · ${esc(disc)}（总序号 ${r[4]}）</div>`;
+      }).join('');
+      return `<div class="result-item full" style="padding:8px 12px;text-align:left">
+      <div class="label" style="margin-bottom:2px">南大核心</div>
+      <div class="value" style="font-size:12px;font-weight:400;color:#8a6d3b">⚠ 目录中有 ${cands.length} 本同名刊，请按主办单位 / 出版地确认：</div>
+      <div style="font-size:11px;color:#8a6d3b;font-weight:400;line-height:1.6">${list}</div>
+    </div>`;
+    }
+    return `<div class="result-item full" style="padding:8px 12px;text-align:left">
+      <div class="label" style="margin-bottom:2px">南大核心</div>
+      <div class="value" style="font-size:12px;font-weight:400;color:#bbb">未收录（非 CSSCI 来源期刊）</div>
+    </div>`;
+  }
+  const cs = STATE.cs, isExt = csHit[1] === 1;
+  const disc = isExt ? (cs.extDiscs[csHit[2]] || '') : (cs.discs[csHit[2]] || '');
+  const cnt = isExt ? (cs.extDiscCounts[csHit[2]] || 0) : (cs.discCounts[csHit[2]] || 0);
+  const tot = isExt ? cs.extTotal : cs.total;
+  const tag = isExt ? 'CSSCI 扩展版' : '南大核心 CSSCI';
+
+  return `<div class="result-item full" style="padding:9px 12px;text-align:left;background:${isExt ? '#eef4fb' : '#e8f1fa'};border-radius:8px">
+      <div class="label" style="margin-bottom:3px">南大核心</div>
+      <div class="value" style="font-size:14px;font-weight:700;color:#1a5c9e">${isExt ? '◻' : '✅'} ${tag} ${esc(cs.version)} · ${esc(disc)}</div>
+      <div style="font-size:11px;color:#7d99b8;margin-top:3px;font-weight:400">
+        学科内序号 ${csHit[3]} / ${cnt} &nbsp;·&nbsp; 总序号 ${csHit[4]} / ${tot}${isExt ? ' &nbsp;·&nbsp; 扩展版非来源期刊，认定口径请以本单位规定为准' : ''}
+      </div>
+    </div>`;
+}
+
+// 标题旁的南大核心徽标
+function csTitleBadge(csHit) {
+  if (!csHit) return '';
+  return csHit[1] === 1
+    ? '<span class="badge-cs-ext" style="font-size:10px;padding:2px 6px;margin-left:4px">CSSCI扩展</span>'
+    : '<span class="badge-cs" style="font-size:10px;padding:2px 6px;margin-left:4px">南大核心</span>';
+}
+
+
+// ==================== 合并反向定位（北大 + 南大） ====================
+// 两张刊名表合一后扫正文：一次扫完取「位置最靠前 + 名字最长」的那个，
+// 再回头分别判它属于北大核心 / 南大核心的哪一档。
+// 合并而不是各扫各的，是为了避免两边各报一个不同刊物。
+let zhCandCache = null, zhCandStamp = '';
+
+function zhCandidates() {
+  const cn = STATE.cn, cs = STATE.cs;
+  const stamp = (cn ? cn.total : 0) + '|' + (cs ? cs.total + '/' + cs.extTotal : 0);
+  if (zhCandCache && zhCandStamp === stamp) return zhCandCache;
+
+  const normList = [], rawList = [], seen = new Set();
+  const push = (norms, raws) => {
+    for (let i = 0; i < norms.length; i++) {
+      const nm = norms[i];
+      // 少于 4 字的刊名（如「混凝土」）是正文高频词，命中无意义
+      if (!nm || nm.length < 4 || seen.has(nm)) continue;
+      seen.add(nm); normList.push(nm); rawList.push(raws[i]);
+    }
+  };
+  if (cn) push(cn.names, cn.journals.map(r => r[0]));
+  if (cs) push(cs.names, cs.journals.map(r => r[0]));
+
+  zhCandCache = { norms: normList, raws: rawList };
+  zhCandStamp = stamp;
+  return zhCandCache;
+}
+
+// 返回命中的**原始刊名**（带括号等原样写法，便于展示）；未命中返回 null
+function zhFindInText(text) {
+  if (!text) return null;
+  const { norms, raws } = zhCandidates();
+  if (!norms.length) return null;
+
   const scan = (scope, requireUnique) => {
-    let best = null, bestPos = Infinity, bestLen = -1, count = 0;
-    const names = cn.names, J = cn.journals;
-    for (let i = 0, n = names.length; i < n; i++) {
-      const nm = names[i];
-      // 少于 4 字的刊名（如「混凝土」）是正文里的高频词，命中无意义，直接排除
-      if (!nm || nm.length < 4) continue;
+    let bi = -1, bestPos = Infinity, bestLen = -1, count = 0;
+    for (let i = 0, n = norms.length; i < n; i++) {
+      const nm = norms[i];
       const p = scope.indexOf(nm);
       if (p < 0) continue;
       if (requireUnique) {
         if (++count > 1) return null;
-        best = J[i];
+        if (bi < 0) bi = i;
         continue;
       }
       if (p < bestPos || (p === bestPos && nm.length > bestLen)) {
-        best = J[i]; bestPos = p; bestLen = nm.length;
+        bi = i; bestPos = p; bestLen = nm.length;
       }
     }
-    return best;
+    return bi < 0 ? null : raws[bi];
   };
 
   const scanOne = (piece) => {
     const norm = normalizeCn(piece);
     if (norm.length < 6) return null;
-    // 第一轮：篇首 400 字内取最靠前的
+    // 第一轮：篇首 400 字内取最靠前的（中文期刊刊名一般在页眉）
     // 第二轮：仍无果才放开到整段，但必须唯一命中
     return scan(norm.slice(0, 400), false) || scan(norm, true);
   };
 
-  // 按行分段扫（调用方把每页的「页眉+页脚」各自放一行，末尾接第 1 页全文）。
-  // 逐段来而不是拼在一起，是为了让「靠前那页先说话」：页眉页脚命中就该拍板，
-  // 不能被后面正文里的参考文献把唯一性判据搅黄。
+  // 逐段扫：调用方把每页「页眉 + 页脚」各自放一行，末尾接第 1 页全文。
+  // 分段是为了让靠前那页先说话，不被后面参考文献里的刊物搅乱唯一性判据。
   const parts = String(text).split('\n');
   for (const pt of parts) {
     const hit = scanOne(pt);
@@ -996,18 +1246,21 @@ function cnFindInText(text) {
   return null;
 }
 
-// 正文兜底识别。命中则直接出结果并返回 true；未命中返回 false，交回原流程。
-function cnTextFallback(info, source, appendMode) {
-  if (!info || !STATE.cn) return false;
+// 正文兜底识别（北大 + 南大联合）。命中则直接出结果并返回 true。
+function zhTextFallback(info, source, appendMode) {
+  if (!info || (!STATE.cn && !STATE.cs)) return false;
   const text = info.headText || info.firstPageText || '';
   if (!text) return false;
-  const hit = cnFindInText(text);
-  if (!hit) return false;
-  const nm = hit[0];
+
+  const nm = zhFindInText(text);
+  if (!nm) return false;
+  const cnHit = findCn(nm), csHit = findCs(nm);
+  if (!cnHit && !csHit && !csCandidates(nm).length) return false;
+
   const srcX = `PDF正文识别: ${esc(nm)}`;
   const mX = searchJournals(nm);
 
-  if (mX.length) {                       // 新锐库里也有 → 正常卡片（已含中文核心块）
+  if (mX.length) {                       // 新锐库里也有 → 正常卡片（已含两个中文核心块）
     if (info.title) source += `<br>${esc(info.title)}`;
     if (appendMode) {
       $('results').insertAdjacentHTML('beforeend',
@@ -1018,18 +1271,20 @@ function cnTextFallback(info, source, appendMode) {
     return true;
   }
 
-  // 新锐库里没有，但中文核心有 → 直接出中文核心卡片，避免误报「未收录」
+  // 新锐库里没有，但至少一个中文库有 → 直接出中文卡片，避免误报「未收录」
   if (appendMode) {
+    const edge = cnHit ? '#c0392b' : '#1a5c9e';
     $('results').insertAdjacentHTML('beforeend',
-      `<div class="result-card" style="border-left:3px solid #c0392b;margin-bottom:12px">
-        <div class="result-title">${esc(nm)}${cnTitleBadge(hit)}</div>
-        <div class="result-grid">${cnCardBlock(hit)}</div>
+      `<div class="result-card" style="border-left:3px solid ${edge};margin-bottom:12px">
+        <div class="result-title">${esc(nm)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}</div>
+        <div class="result-grid">${cnCardBlock(cnHit)}${csCardBlock(csHit, nm)}</div>
       </div>`);
   } else {
     showResults([], srcX, { journal: nm, title: info.title });
   }
   return true;
 }
+
 
 // 搜索：前缀命中优先，其次包含命中
 function searchCnJournals(query, limit = 40) {
@@ -1046,6 +1301,61 @@ function searchCnJournals(query, limit = 40) {
     if (starts.length >= limit) break;
   }
   return starts.concat(contains).slice(0, limit);
+}
+
+// ==================== 南大核心搜索 / 卡片 ====================
+function searchCsJournals(query, limit = 40) {
+  const cs = STATE.cs;
+  if (!cs || !query) return [];
+  const q = normalizeCn(query);
+  if (!q) return [];
+  const names = cs.names, J = cs.journals;
+  const starts = [], contains = [];
+  for (let i = 0, n = J.length; i < n; i++) {
+    const p = names[i].indexOf(q);
+    if (p === 0) starts.push(J[i]);
+    else if (p > 0) contains.push(J[i]);
+    if (starts.length >= limit) break;
+  }
+  return starts.concat(contains).slice(0, limit);
+}
+
+// CSSCI 行 = [刊名, lib, 学科下标, 学科内序号, 总序号]，lib 0=来源期刊 1=扩展版
+function renderCsCard(m, extraClass = '') {
+  const cs = STATE.cs;
+  const [name, lib, dIdx, idx, no] = m;
+  const isExt = lib === 1;
+  const disc = isExt ? (cs.extDiscs[dIdx] || '') : (cs.discs[dIdx] || '');
+  const cnt = isExt ? (cs.extDiscCounts[dIdx] || 0) : (cs.discCounts[dIdx] || 0);
+  const tot = isExt ? cs.extTotal : cs.total;
+
+  return `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
+    <div class="result-title">${esc(name)}</div>
+    <div class="result-issn">${isExt
+      ? '<span class="badge-cs-ext">CSSCI 扩展版</span><span class="badge-cs-ext" style="background:#f2f6fb;color:#9bb0c7">2025-2026</span>'
+      : '<span class="badge-cs">南大核心</span><span class="badge-cs-ext">2025-2026</span>'}</div>
+    <div class="result-grid">
+      <div class="result-item full">
+        <div class="label">所属学科</div>
+        <div class="value" style="font-size:16px;color:var(--text)">${esc(disc)}</div>
+      </div>
+      <div class="result-item">
+        <div class="label">学科内序号</div>
+        <div class="value" style="color:var(--text);font-size:16px">${idx}<span style="font-size:12px;color:#aaa"> / ${cnt}</span></div>
+      </div>
+      <div class="result-item">
+        <div class="label">总序号</div>
+        <div class="value" style="color:var(--text);font-size:16px">${no}<span style="font-size:12px;color:#aaa"> / ${tot}</span></div>
+      </div>
+      <div class="result-item full">
+        <div class="label" style="margin-bottom:2px">收录层级</div>
+        <div class="value" style="font-size:12px;font-weight:400;color:var(--sub)">${isExt
+          ? 'CSSCI 扩展版（来源期刊之外，认定口径以本单位规定为准）'
+          : 'CSSCI 来源期刊（南大核心正刊）'}</div>
+      </div>
+    </div>
+    <div class="cn-tip cs">${isExt ? '◻ 该刊被 CSSCI(2025-2026) 扩展版收录' : '✅ 该刊被 CSSCI(2025-2026) 来源期刊收录'}</div>
+  </div>`;
 }
 
 function renderCnCard(m, extraClass = '') {
@@ -1082,13 +1392,22 @@ function renderCnCard(m, extraClass = '') {
 
 function showCnResults(list, source = '', query = '', append = false) {
   const el = $('results');
+  const isCs = STATE.cnLib === 'cs';
+  const cardFn = isCs ? renderCsCard : renderCnCard;
+  const accent = isCs ? '#1a5c9e' : '#c0392b';
   if (!append) el.innerHTML = '';
   $('emptyState').classList.add('hidden');
 
   if (!list.length) {
     if (append) return;
-    const tot = STATE.cn ? STATE.cn.total : 1987;
-    el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到「${esc(query)}」<br>2023 版北大核心共收录 ${tot} 种中文期刊<br><span style="font-size:12px;color:#aaa">可尝试期刊简称，如"岩土""建筑结构"</span></div></div>`;
+    if (isCs) {
+      const cs = STATE.cs;
+      const tot = cs ? `${cs.total} 种来源期刊 + ${cs.extTotal} 种扩展版` : '935 种';
+      el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到「${esc(query)}」<br>CSSCI(2025-2026) 共 ${tot}<br><span style="font-size:12px;color:#aaa">可尝试期刊简称，如"经济""法学"</span></div></div>`;
+    } else {
+      const tot = STATE.cn ? STATE.cn.total : 1987;
+      el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到「${esc(query)}」<br>2023 版北大核心共收录 ${tot} 种中文期刊<br><span style="font-size:12px;color:#aaa">可尝试期刊简称，如"岩土""建筑结构"</span></div></div>`;
+    }
     return;
   }
 
@@ -1108,18 +1427,18 @@ function showCnResults(list, source = '', query = '', append = false) {
 
   const MAX = 30;
   const wrap = document.createElement('div');
-  list.slice(0, MAX).forEach(m => { wrap.innerHTML += renderCnCard(m); });
+  list.slice(0, MAX).forEach(m => { wrap.innerHTML += cardFn(m); });
   frag.appendChild(wrap);
 
   if (list.length > MAX) {
     const btnDiv = document.createElement('div');
     btnDiv.style.cssText = 'text-align:center;padding:8px';
     btnDiv.innerHTML = `<button onclick="this.remove();document.querySelectorAll('.cn-folded').forEach(el=>{el.style.display='';el.style.animation='fadeIn .3s ease'})"
-      style="background:none;border:1px solid #c0392b;color:#c0392b;padding:8px 24px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit">
+      style="background:none;border:1px solid ${accent};color:${accent};padding:8px 24px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit">
       显示全部 ${list.length} 种</button>`;
     frag.appendChild(btnDiv);
     const hw = document.createElement('div');
-    for (let i = MAX; i < list.length; i++) hw.innerHTML += renderCnCard(list[i], 'cn-folded');
+    for (let i = MAX; i < list.length; i++) hw.innerHTML += cardFn(list[i], 'cn-folded');
     frag.appendChild(hw);
   }
 
@@ -1130,34 +1449,69 @@ function showCnResults(list, source = '', query = '', append = false) {
 function showCnSuggestions(list) {
   const el = $('cnSuggestions');
   if (!list.length) { el.classList.remove('show'); el.innerHTML = ''; return; }
-  const cn = STATE.cn;
-  el.innerHTML = list.map((j, i) => {
-    const disc = cn ? (cn.discs[j[1]] || '') : '';
-    return `<div class="sug-item" data-idx="${i}">
-      <div class="sug-name">${esc(j[0])}</div>
-      <div class="sug-meta"><span class="badge-cn">北大核心</span><span style="color:#888;font-size:11px">${esc(disc)}</span></div>
-    </div>`;
-  }).join('');
+  if (STATE.cnLib === 'cs') {
+    const cs = STATE.cs;
+    el.innerHTML = list.map((j, i) => {
+      const isExt = j[1] === 1;
+      const disc = cs ? (isExt ? (cs.extDiscs[j[2]] || '') : (cs.discs[j[2]] || '')) : '';
+      const badge = isExt
+        ? '<span class="badge-cs-ext">CSSCI 扩展版</span>'
+        : '<span class="badge-cs">南大核心</span>';
+      return `<div class="sug-item" data-idx="${i}">
+        <div class="sug-name">${esc(j[0])}</div>
+        <div class="sug-meta">${badge}<span style="color:#888;font-size:11px">${esc(disc)}</span></div>
+      </div>`;
+    }).join('');
+  } else {
+    const cn = STATE.cn;
+    el.innerHTML = list.map((j, i) => {
+      const disc = cn ? (cn.discs[j[1]] || '') : '';
+      return `<div class="sug-item" data-idx="${i}">
+        <div class="sug-name">${esc(j[0])}</div>
+        <div class="sug-meta"><span class="badge-cn">北大核心</span><span style="color:#888;font-size:11px">${esc(disc)}</span></div>
+      </div>`;
+    }).join('');
+  }
   el.classList.add('show');
 }
 
-// 按学科浏览：7 编分组，148 个学科
+// 按学科浏览。北大核心：7 编分组 148 学科；CSSCI：来源期刊/扩展版两组，各 26 学科
 function renderCnBrowse() {
   const area = $('cnBrowseArea');
-  const cn = STATE.cn;
-  if (!cn) { area.innerHTML = '<div class="cn-disc-item" style="cursor:default;color:#999">数据加载中…</div>'; return; }
-  if (area.dataset.rendered === '1') return;
+  area.dataset.rendered = '';
   let h = '';
-  cn.editions.forEach((ed, ei) => {
-    let inner = '';
-    cn.discs.forEach((dn, di) => {
-      if (cn.discEd[di] !== ei) return;
-      inner += `<div class="cn-disc-item" data-disc="${di}">
-        <span>${esc(dn)}</span><span class="cn-disc-count">${cn.discCounts[di]} 种</span>
-      </div>`;
+
+  if (STATE.cnLib === 'cs') {
+    const cs = STATE.cs;
+    if (!cs) { area.innerHTML = '<div class="cn-disc-item" style="cursor:default;color:#999">数据加载中…</div>'; return; }
+    const grp = (title, discList, counts, lib) => {
+      let inner = '';
+      discList.forEach((dn, di) => {
+        const n = counts[di] || 0;
+        if (!n) return;
+        inner += `<div class="cn-disc-item" data-csdisc="${di}" data-cslib="${lib}" data-cshead="${esc(title)}">
+          <span>${esc(dn)}</span><span class="cn-disc-count">${n} 种</span>
+        </div>`;
+      });
+      if (inner) h += `<div class="cn-disc-head cs">${esc(title)}</div>` + inner;
+    };
+    grp(`CSSCI 来源期刊（${cs.total} 种）`, cs.discs, cs.discCounts, 0);
+    grp(`CSSCI 扩展版（${cs.extTotal} 种）`, cs.extDiscs, cs.extDiscCounts, 1);
+  } else {
+    const cn = STATE.cn;
+    if (!cn) { area.innerHTML = '<div class="cn-disc-item" style="cursor:default;color:#999">数据加载中…</div>'; return; }
+    cn.editions.forEach((ed, ei) => {
+      let inner = '';
+      cn.discs.forEach((dn, di) => {
+        if (cn.discEd[di] !== ei) return;
+        inner += `<div class="cn-disc-item" data-disc="${di}">
+          <span>${esc(dn)}</span><span class="cn-disc-count">${cn.discCounts[di]} 种</span>
+        </div>`;
+      });
+      if (inner) h += `<div class="cn-disc-head">${esc(ed)}</div>` + inner;
     });
-    if (inner) h += `<div class="cn-disc-head">${esc(ed)}</div>` + inner;
-  });
+  }
+
   area.innerHTML = h;
   area.dataset.rendered = '1';
 }
@@ -1168,6 +1522,18 @@ function showCnDisc(di) {
   const list = cn.journals.filter(j => j[1] === di);
   const ed = cn.editions[cn.discEd[di]] || '';
   const source = `📚 <b>${esc(cn.discs[di])}</b> · 共 ${list.length} 种<br><span style="color:#aaa">${esc(ed)}</span>`;
+  $('cnBrowseArea').classList.add('hidden');
+  $('cnSuggestions').classList.remove('show');
+  showCnResults(list, source);
+}
+
+// CSSCI 按学科：lib 0=来源期刊 1=扩展版
+function showCsDisc(di, lib, head) {
+  const cs = STATE.cs;
+  if (!cs) return;
+  const list = cs.journals.filter(j => j[1] === lib && j[2] === di);
+  const disc = lib === 1 ? (cs.extDiscs[di] || '') : (cs.discs[di] || '');
+  const source = `📚 <b>${esc(disc)}</b> · 共 ${list.length} 种<br><span style="color:#aaa">${esc(head)} · CSSCI ${esc(cs.version)}</span>`;
   $('cnBrowseArea').classList.add('hidden');
   $('cnSuggestions').classList.remove('show');
   showCnResults(list, source);
@@ -1190,8 +1556,11 @@ $$('.mode-btn').forEach(btn => {
     if (STATE.mode === 'doi') { $('doiInput').focus(); checkClipboard(); }
     if (STATE.mode === 'cn') {
       $('cnSuggestions').classList.remove('show');
+      $('cnBrowseArea').classList.add('hidden');
+      $('cnBrowseArea').dataset.rendered = '';
+      $('cnBrowseBtn').textContent = '按学科';
+      updateZhStat();
       $('cnInput').focus();
-      if (!STATE.cnLoaded && $('cnStat')) $('cnStat').textContent = '中文核心数据加载中…';
     }
   });
 });
@@ -1290,9 +1659,39 @@ $('suggestions').addEventListener('click', function(e) {
   }
 });
 
-// ==================== 中文核心 交互 ====================
+// ==================== 中文收录 交互 ====================
 let cnSuggResults = [];
 let cnSuggIndex = -1;
+
+// 当前库是否就绪
+function zhLibReady() {
+  return STATE.cnLib === 'cs' ? STATE.csLoaded : STATE.cnLoaded;
+}
+function zhSearch(q, limit) {
+  return STATE.cnLib === 'cs' ? searchCsJournals(q, limit) : searchCnJournals(q, limit);
+}
+
+// 库切换（北大核心 / 南大核心 CSSCI）
+$$('#libSwitch button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    STATE.cnLib = btn.dataset.lib;
+    $$('#libSwitch button').forEach(b => b.classList.toggle('active', b === btn));
+    $('cnBrowseArea').classList.add('hidden');
+    $('cnBrowseArea').dataset.rendered = '';
+    $('cnBrowseBtn').textContent = '按学科';
+    $('cnSuggestions').classList.remove('show');
+    $('results').innerHTML = '';
+    $('emptyState').classList.remove('hidden');
+    const inp = $('cnInput');
+    inp.placeholder = STATE.cnLib === 'cs'
+      ? '输入中文期刊名，如：经济研究'
+      : '输入中文期刊名，如：岩土工程学报';
+    inp.value = '';
+    $('cnClearBtn').classList.add('hidden');
+    updateZhStat();
+    inp.focus();
+  });
+});
 
 $('cnInput').addEventListener('input', debounce(function() {
   const q = this.value.trim();
@@ -1302,8 +1701,8 @@ $('cnInput').addEventListener('input', debounce(function() {
     cnSuggIndex = -1;
     return;
   }
-  if (!STATE.cnLoaded) return;
-  cnSuggResults = searchCnJournals(q, 12);
+  if (!zhLibReady()) return;
+  cnSuggResults = zhSearch(q, 12);
   cnSuggIndex = -1;
   showCnSuggestions(cnSuggResults);
 }, 120));
@@ -1339,9 +1738,12 @@ $('cnInput').addEventListener('keydown', function(e) {
     }
     const q = this.value.trim();
     if (!q) return;
-    if (!STATE.cnLoaded) { showToast('中文核心数据加载中，请稍候'); return; }
-    const res = searchCnJournals(q, 200);
-    showCnResults(res, res.length ? `🔍 <b>${esc(q)}</b> · 北大核心 2023 版` : '', q);
+    if (!zhLibReady()) { showToast('中文收录数据加载中，请稍候'); return; }
+    const res = zhSearch(q, 200);
+    const head = STATE.cnLib === 'cs'
+      ? `🔍 <b>${esc(q)}</b> · CSSCI ${esc(STATE.cs ? STATE.cs.version : '')}`
+      : `🔍 <b>${esc(q)}</b> · 北大核心 2023 版`;
+    showCnResults(res, res.length ? head : '', q);
     sugEl.classList.remove('show');
   }
 });
@@ -1368,7 +1770,12 @@ $('cnBrowseBtn').addEventListener('click', () => {
 
 $('cnBrowseArea').addEventListener('click', e => {
   const item = e.target.closest('.cn-disc-item');
-  if (!item || item.dataset.disc === undefined) return;
+  if (!item) return;
+  if (item.dataset.csdisc !== undefined) {
+    showCsDisc(parseInt(item.dataset.csdisc, 10), parseInt(item.dataset.cslib, 10), item.dataset.cshead || '');
+    return;
+  }
+  if (item.dataset.disc === undefined) return;
   showCnDisc(parseInt(item.dataset.disc, 10));
 });
 
@@ -1530,7 +1937,7 @@ async function processPdf(file, idx = 1, total = 1) {
   if (!info.journal && !info.doi && !info.issn) {
     // 中文期刊 PDF 常常既无元数据也无 DOI。先让中文核心库用刊名表在页眉页脚里反向定位，
     // 认出来了就正常出结果，不再直接判定「无元数据」。
-    if (cnTextFallback(info, '', appendMode)) return;
+    if (zhTextFallback(info, '', appendMode)) return;
     const readChars = String(info.headText || '').trim().length;
     if (appendMode) {
       showToast(`${file.name.substring(0,30)} 未识别到刊名`);
@@ -1542,14 +1949,14 @@ async function processPdf(file, idx = 1, total = 1) {
             <div style="font-size:15px;font-weight:600;margin-bottom:6px">没能确认这篇 PDF 的刊名</div>
             <div style="font-size:13px;color:var(--sub);line-height:1.6">
               ${readChars
-                ? `已读到 PDF 的文字（页眉页脚共 ${readChars} 字），但没能在北大核心 2023 年版的 1987 种名单里找到对应刊名。`
+                ? `已读到 PDF 的文字（页眉页脚共 ${readChars} 字），但没能在北大核心 2023 年版的 1987 种、以及南大 CSSCI 的 935 种名单里找到对应刊名。`
                 : `这个 PDF 里没有可提取的文字（多半是扫描件／图片版），页眉页脚读不出内容。`}<br><br>
               <span style="font-weight:500;color:var(--text)">可能的原因：</span><br>
-              &nbsp;1.&nbsp; 该刊<span style="font-weight:500">不属于北大中文核心</span>（行业刊、内部刊等）<br>
+              &nbsp;1.&nbsp; 该刊<span style="font-weight:500">既非北大中文核心，也不属于南大 CSSCI</span>（行业刊、内部刊等）<br>
               &nbsp;2.&nbsp; 刊名印在扫描图上，PDF 里没有文字层<br>
               &nbsp;3.&nbsp; 版面特殊，刊名不在页眉或页脚<br><br>
               <span style="font-weight:500;color:var(--text)">建议：</span><br>
-              &nbsp;·&nbsp; 切到「<span style="color:var(--blue);font-weight:500">期刊名</span>」模式直接输入刊名，立刻就能确认是否属于北大核心<br>
+              &nbsp;·&nbsp; 切到「<span style="color:var(--blue);font-weight:500">期刊名</span>」模式直接输入刊名，立刻就能确认它属于哪个库<br>
               &nbsp;·&nbsp; 有 DOI 的话用「<span style="color:var(--blue);font-weight:500">DOI</span>」模式
             </div>
           </div>
@@ -1592,11 +1999,13 @@ async function processPdf(file, idx = 1, total = 1) {
           // Fast append for multi-PDF: skip showResults flow
           const rawJ = crossrefInfo.journal || crossrefInfo.title || '未知期刊';
           const cnHitA = findCn(crossrefInfo.journal || '');
+          const csHitA = findCs(crossrefInfo.journal || '');
+          const edgeA = cnHitA ? '#c0392b' : (csHitA ? '#1a5c9e' : '#e67e22');
           $('results').insertAdjacentHTML('beforeend',
-            `<div class="result-card" style="border-left:3px solid ${cnHitA ? '#c0392b' : '#e67e22'};margin-bottom:12px">
-              <div class="result-title">${esc(rawJ)}${cnTitleBadge(cnHitA)}</div>
+            `<div class="result-card" style="border-left:3px solid ${edgeA};margin-bottom:12px">
+              <div class="result-title">${esc(rawJ)}${cnTitleBadge(cnHitA)}${csTitleBadge(csHitA)}</div>
               <div class="result-grid">
-                ${cnHitA ? cnCardBlock(cnHitA) : '<div style="font-size:12px;color:#e67e22;text-align:center;padding:8px">暂未收录</div>'}
+                ${cnCardBlock(cnHitA)}${csCardBlock(csHitA, rawJ)}
               </div>
             </div>`);
         } else {
@@ -1612,15 +2021,17 @@ async function processPdf(file, idx = 1, total = 1) {
     source = `PDF提取: ${esc(info.journal)}`;
     matches = searchJournals(info.journal);
     if (!matches.length) {
-      // 元数据刊名不可信（可能是「OCR-PDF」这类软件名）→ 先试中文核心正文反向定位
-      if (cnTextFallback(info, source, appendMode)) return;
+      // 元数据刊名不可信（可能是「OCR-PDF」这类软件名）→ 先用北大+南大刊名表做正文反向定位
+      if (zhTextFallback(info, source, appendMode)) return;
       const cnHitB = findCn(info.journal);
+      const csHitB = findCs(info.journal);
+      const edgeB = cnHitB ? '#c0392b' : (csHitB ? '#1a5c9e' : '#e67e22');
       if (appendMode) {
         $('results').insertAdjacentHTML('beforeend',
-          `<div class="result-card" style="border-left:3px solid ${cnHitB ? '#c0392b' : '#e67e22'};margin-bottom:12px">
-            <div class="result-title">${esc(info.journal || info.title || '未知期刊')}${cnTitleBadge(cnHitB)}</div>
+          `<div class="result-card" style="border-left:3px solid ${edgeB};margin-bottom:12px">
+            <div class="result-title">${esc(info.journal || info.title || '未知期刊')}${cnTitleBadge(cnHitB)}${csTitleBadge(csHitB)}</div>
             <div class="result-grid">
-              ${cnHitB ? cnCardBlock(cnHitB) : '<div style="font-size:12px;color:#e67e22;text-align:center;padding:8px">暂未收录</div>'}
+              ${cnCardBlock(cnHitB)}${csCardBlock(csHitB, info.journal)}
             </div>
           </div>`);
       } else {
@@ -1631,7 +2042,7 @@ async function processPdf(file, idx = 1, total = 1) {
   }
   
   // 元数据里没有刊名（中文期刊 PDF 常态）→ 中文核心正文兜底
-  if (!matches.length && cnTextFallback(info, source, appendMode)) return;
+  if (!matches.length && zhTextFallback(info, source, appendMode)) return;
 
   if (!matches.length && info.issn) {
     matches = searchJournals(info.issn);
@@ -1640,12 +2051,14 @@ async function processPdf(file, idx = 1, total = 1) {
   
   if (!matches.length) {
     const cnHitC = findCn(info.journal);
+    const csHitC = findCs(info.journal);
+    const edgeC = cnHitC ? '#c0392b' : (csHitC ? '#1a5c9e' : 'var(--border)');
     if (appendMode) {
       $('results').insertAdjacentHTML('beforeend',
-        `<div class="result-card" style="border-left:3px solid ${cnHitC ? '#c0392b' : 'var(--border)'};margin-bottom:12px">
-          <div class="result-title">${esc(info.journal || info.title || '未识别期刊')}${cnTitleBadge(cnHitC)}</div>
+        `<div class="result-card" style="border-left:3px solid ${edgeC};margin-bottom:12px">
+          <div class="result-title">${esc(info.journal || info.title || '未识别期刊')}${cnTitleBadge(cnHitC)}${csTitleBadge(csHitC)}</div>
           <div class="result-grid">
-            ${cnHitC ? cnCardBlock(cnHitC) : '<div style="font-size:12px;color:var(--sub);text-align:center;padding:8px">未能匹配到数据库</div>'}
+            ${cnCardBlock(cnHitC)}${csCardBlock(csHitC, info.journal)}
           </div>
         </div>`);
     } else {
