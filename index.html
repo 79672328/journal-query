@@ -117,6 +117,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .cn-disc-item:active{background:#eef3fa}
 .cn-disc-count{font-size:11px;color:#aaa;flex-shrink:0}
 .cn-stat{font-size:11px;color:#999;text-align:center;margin-top:6px;line-height:1.5}
+.cn-note{display:none;font-size:11px;color:#a8b0b8;text-align:center;margin-top:4px;line-height:1.55}
 .cn-tip{margin-top:12px;padding:9px 12px;background:#fdf3f2;border-radius:8px;font-size:12px;color:#a5352a;line-height:1.5}
 
 /* ===== 南大核心 (CSSCI) ===== */
@@ -124,9 +125,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .badge-cs-ext{display:inline-block;background:#e8f1fa;color:#1a5c9e;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:500;margin:0 4px 0 0;vertical-align:middle}
 .cn-disc-head.cs{background:#1a5c9e}
 .cn-tip.cs{background:#eef4fb;color:#1a5c9e}
+.badge-cscd{display:inline-block;background:#1e6f5c;color:#fff;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:600;margin:0 2px 0 0;vertical-align:middle}
+.badge-cscd-ext{display:inline-block;background:#e6f2ee;color:#1e6f5c;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:500;margin:0 4px 0 0;vertical-align:middle}
+.cn-disc-head.cscd{background:#1e6f5c}
+.cn-tip.cscd{background:#e9f3f0;color:#1e6f5c}
 .lib-switch{display:flex;gap:6px;margin-bottom:8px}
 .lib-switch button{flex:1;padding:7px 4px;font-size:12px;border:1.5px solid var(--border);background:#fff;border-radius:8px;color:var(--sub);cursor:pointer;font-family:inherit;white-space:nowrap}
-.lib-switch button.active{border-color:#1a5c9e;color:#1a5c9e;background:#eef4fb;font-weight:600}
+.lib-switch button.active{font-weight:600}
+.lib-switch button.active[data-lib="cn"]{border-color:#c0392b;color:#c0392b;background:#fdf3f2}
+.lib-switch button.active[data-lib="cs"]{border-color:#1a5c9e;color:#1a5c9e;background:#eef4fb}
+.lib-switch button.active[data-lib="cscd"]{border-color:#1e6f5c;color:#1e6f5c;background:#e9f3f0}
 
 </style>
 </head>
@@ -136,7 +144,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     <div class="header-icon">JQ</div>
     <div>
       <h1>新锐期刊分区查询</h1>
-      <div class="sub">影响因子 &middot; 新锐分区 &middot; 北大核心 &middot; 南大核心 CSSCI &middot; 2026</div>
+      <div class="sub">影响因子 &middot; 新锐分区 &middot; 北大核心 &middot; 南大核心 CSSCI &middot; 中科院 CSCD &middot; 2026</div>
     </div>
   </div>
 
@@ -181,7 +189,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <div class="upload-area" id="uploadArea">
         <div class="icon">📄</div>
         <div class="text" id="uploadText">点击或拖拽上传PDF</div>
-        <div class="hint">自动提取期刊信息，支持80MB内PDF，可多选<br>结果同时给出新锐分区、JCR分区，以及北大核心 / 南大核心 CSSCI 收录情况</div>
+        <div class="hint">自动提取期刊信息，支持80MB内PDF，可多选<br>结果同时给出新锐分区、JCR分区，以及北大核心 / 南大核心 CSSCI / 中科院 CSCD 收录情况</div>
       </div>
       <div id="wxUpload" style="display:none;margin-top:10px">
         <div style="text-align:center;font-size:11px;color:#999;margin-bottom:8px">— 微信用户推荐 —</div>
@@ -193,11 +201,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <input type="file" id="pdfInput" accept=".pdf" multiple class="hidden">
     </div>
 
-    <!-- 中文收录（北大核心 + 南大核心 CSSCI） -->
+    <!-- 中文收录（北大核心 + 南大核心 CSSCI + 中科院 CSCD） -->
     <div id="modeCn" class="hidden">
       <div class="lib-switch" id="libSwitch">
         <button class="active" data-lib="cn">北大核心</button>
         <button data-lib="cs">南大核心 CSSCI</button>
+        <button data-lib="cscd">中科院 CSCD</button>
       </div>
       <div class="input-row" style="position:relative">
         <input type="text" id="cnInput" placeholder="输入中文期刊名，如：岩土工程学报" autocomplete="off">
@@ -207,6 +216,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <div id="cnBrowseArea" class="cn-browse hidden" style="margin-top:8px"></div>
       <div class="suggestions" id="cnSuggestions"></div>
       <div class="cn-stat" id="cnStat">北大《中文核心期刊要目总览》2023年版 · 7 编 148 个学科</div>
+      <div class="cn-note" id="cnNote"></div>
     </div>
   </div>
 
@@ -227,7 +237,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 
   <!-- Data status -->
   <div class="stats" id="stats"></div>
-  <div class="stats" style="padding-top:0;color:#bbb">v18 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
+  <div class="stats" style="padding-top:0;color:#bbb">v19 &middot; 数据来源于公开信息，仅供学术参考，不构成任何商业用途。</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -290,7 +300,10 @@ const STATE = {
   // 南大核心 (CSSCI 2025-2026 来源期刊 + 扩展版)
   cs: null,          // {journals, names, discs, libs, discCounts, total, extTotal, version, src}
   csLoaded: false,
-  cnLib: 'cn'        // 「中文收录」页当前浏览的库: cn | cs
+  // 中科院 CSCD (2025-2026 来源期刊：核心库 + 扩展库，含中文刊与英文刊)
+  cscd: null,        // {journals, names, cls, clsCounts, total, coreTotal, extTotal, version, src}
+  cscdLoaded: false,
+  cnLib: 'cn'        // 「中文收录」页当前浏览的库: cn | cs | cscd
 };
 
 // ==================== Data Loading ====================
@@ -315,6 +328,8 @@ async function loadData() {
     loadCnData();
     // 南大核心 CSSCI 库同样独立加载
     loadCsData();
+    // 中科院 CSCD 库独立加载
+    loadCscdData();
   } catch(e) {
     console.error('Data load error:', e);
     $('stats').textContent = '数据加载失败，请刷新重试';
@@ -469,15 +484,131 @@ async function loadCsData() {
   }
 }
 
+// ==================== 中科院 CSCD 数据加载 ====================
+// 数据来源：中国科学院文献情报中心 中国科学引文数据库（CSCD）2025-2026 年度来源期刊。
+// 官方口径：总计 1501 种 = 核心库 C 1117 + 扩展库 E 384；其中中文刊 1046、英文刊 455。
+// 载荷每行 [刊名, lib, lang, issn, cn]，前端补出分类下标与序号：
+//   row = [刊名, lib, 分类下标, 分类内序号, 总序号, lang, issn, cn]
+//   lib 0=核心库 1=扩展库；lang 0=中文刊 1=英文刊
+// 分类取自 CN 刊号的分类号（如 11-2120/TU -> TU），取不到者归入「未标注 CN 号」。
+
+// 《中国图书馆分类法》类目名（数据中实际出现的分类号均在此表内）
+const CSCD_CLS_NAME = {
+  B: '哲学、宗教', C: '社会科学总论', D: '政治、法律', E: '军事', F: '经济',
+  G: '文化、科学、教育、体育', K: '历史、地理', N: '自然科学总论',
+  O: '数理科学和化学', P: '天文学、地球科学', Q: '生物科学', R: '医药、卫生',
+  S: '农业科学', T: '工业技术', U: '交通运输', V: '航空、航天',
+  X: '环境科学、安全科学',
+  TB: '一般工业技术', TD: '矿业工程', TE: '石油、天然气工业', TF: '冶金工业',
+  TG: '金属学与金属工艺', TH: '机械、仪表工业', TJ: '武器工业',
+  TK: '能源与动力工程', TL: '原子能技术', TM: '电工技术',
+  TN: '无线电电子学、电信技术', TP: '自动化技术、计算机技术',
+  TQ: '化学工业', TS: '轻工业、手工业', TU: '建筑科学', TV: '水利工程'
+};
+const CSCD_CLS_NONE = '未标注 CN 号';
+const CSCD_CLS_RE = /\/([A-Z]{1,2})/;
+
+// 分类号 -> 展示名。空分类号表示该刊 CN 号缺失（官方遴选对象含“仅有 ISSN 的卓越计划高起点新刊”）
+function cscdClsLabel(c) {
+  if (!c) return CSCD_CLS_NONE;
+  const n = CSCD_CLS_NAME[c];
+  return n ? `${n}（${c}）` : c;
+}
+
+async function loadCscdData() {
+  try {
+    const resp = await fetch('cscd_data.json');
+    if (!resp.ok) throw new Error('CSCD data fetch failed: ' + resp.status);
+    const wrap = await resp.json();
+
+    let d;
+    if (wrap.gz) {
+      const b64 = Array.isArray(wrap.gz) ? wrap.gz.join('') : wrap.gz;
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+      d = JSON.parse(await new Response(stream).text());
+    } else {
+      d = wrap;
+    }
+
+    const js = d.journals || [];
+
+    // 第一遍：确定分类表（字母序，无 CN 号者置末）
+    const cset = new Set();
+    js.forEach(j => { const m = CSCD_CLS_RE.exec(j[4] || ''); cset.add(m ? m[1] : ''); });
+    const cls = [...cset].filter(x => x).sort();
+    if (cset.has('')) cls.push('');
+    const clsIdxOf = new Map(cls.map((c, i) => [c, i]));
+    const clsCounts = [new Array(cls.length).fill(0), new Array(cls.length).fill(0)];   // [核心库, 扩展库]
+
+    // 第二遍：建行
+    const rows = js.map((j, i) => {
+      const lib = j[1] === 1 ? 1 : 0;
+      const m = CSCD_CLS_RE.exec(j[4] || '');
+      const ci = clsIdxOf.get(m ? m[1] : '');
+      return [tidyZhName(j[0]), lib, ci, ++clsCounts[lib][ci], i + 1, j[2] === 1 ? 1 : 0, j[3] || '', j[4] || ''];
+    });
+
+    STATE.cscd = {
+      journals: rows,
+      // 索引键必须与 findCscd / cscdCandidates / searchCscdJournals 的查询键同源，
+      // 否则含 & 的英文刊（如 Space: Science & Technology）在查询侧被归一成 and 后永远对不上。
+      names: rows.map(r => cscdKey(r[0] || '')),
+      cls: cls,
+      clsCounts: clsCounts,
+      total: rows.length,
+      coreTotal: d.coreTotal || 0,
+      extTotal: d.extTotal || 0,
+      cnTotal: d.cnTotal || 0,
+      enTotal: d.enTotal || 0,
+      version: d.v,
+      src: d.src
+    };
+
+    // 名称索引。核心库排在前面，同名时优先归到核心库。键用 cscdKey，与查询侧同源。
+    STATE.cscd.cscdMap = new Map();
+    rows.forEach(r => {
+      const k = cscdKey(r[0] || '');
+      if (k && !STATE.cscd.cscdMap.has(k)) STATE.cscd.cscdMap.set(k, r);
+    });
+    STATE.cscdLoaded = true;
+    updateZhStat();
+
+    // 时序保护：与北大 / 南大核心同理，晚到时重绘已有结果
+    if (STATE.lastResults && $('results') && $('results').innerHTML.trim()) {
+      const lr = STATE.lastResults;
+      STATE.lastResults = null;
+      showResults(lr.matches, lr.source, lr.unknownJournal);
+    }
+  } catch(e) {
+    console.error('CSCD data load error:', e);
+    updateZhStat();
+  }
+}
+
 // 「中文收录」页的库说明行，随当前库切换
 function updateZhStat() {
   const stat = $('cnStat');
   if (!stat) return;
-  const cn = STATE.cn, cs = STATE.cs;
-  if (STATE.cnLib === 'cs') {
+  const cn = STATE.cn, cs = STATE.cs, cd = STATE.cscd;
+  const note = $('cnNote');
+  if (note) { note.textContent = ''; note.style.display = 'none'; }
+  if (STATE.cnLib === 'cscd') {
+    stat.textContent = cd
+      ? `${cd.src}(${cd.version}) · 共 ${cd.total} 种（核心库 ${cd.coreTotal} + 扩展库 ${cd.extTotal}） · 中文刊 ${cd.cnTotal} / 英文刊 ${cd.enTotal}`
+      : 'CSCD 数据加载中…';
+  } else if (STATE.cnLib === 'cs') {
     stat.textContent = cs
       ? `${cs.src}(${cs.version}) · 来源期刊 ${cs.total} 种 + 扩展版 ${cs.extTotal} 种 · ${cs.discs.length} 个学科`
       : '南大核心数据加载中…';
+    // CSSCI 目录含港澳台地区期刊，括注地区名是目录原有的区分标记（如「地理学报(北京)」「地理学报(台湾)」）。
+    // 刊名一律按目录原样呈现以保证可核对；此处说明避免被误读为独立国家/地区。
+    if (note && cs) {
+      note.textContent = '说明：目录收录中国台湾、中国香港、中国澳门地区期刊，括注的地区名沿用目录原文，仅用于区分同名刊。';
+      note.style.display = 'block';
+    }
   } else {
     stat.textContent = cn
       ? `${cn.src} · 共 ${cn.total.toLocaleString()} 种 · ${cn.editions.length} 编 ${cn.discs.length} 个学科`
@@ -820,13 +951,14 @@ function renderCard(m, extraClass = '') {
   const [name, issn, jif, jcrQ, xrCat, xrQ, wosIdx, wosSubj] = m;
   const cnHit = findCn(name);          // 中文核心联查（数据未就绪时返回 null）
   const csHit = findCs(name);          // 南大核心联查
+  const cdHit = findCscd(name);        // 中科院 CSCD 联查
   const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
   const jcrColorClass = jcrQ ? 'badge-' + jcrQ.toLowerCase() : '';
   const wosBadge = wosIdx ? wosIdx.split(' | ').map(i => `<span style="display:inline-block;background:#e8f5e9;color:#2e7d32;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;margin:0 2px">${i}</span>`).join('') : '';
   const wosSubjShort = wosSubj ? wosSubj.split(' | ').slice(0, 3).join(' · ') : '';
   
   let h = `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
-    <div class="result-title">${esc(name)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}</div>
+    <div class="result-title">${esc(name)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}</div>
     <div class="result-issn">${issn ? 'ISSN ' + issn : ''}${wosBadge ? '  ' + wosBadge : ''}</div>
     <div class="result-grid">`;
   if (xrCat || xrQ) {
@@ -851,7 +983,7 @@ function renderCard(m, extraClass = '') {
       <div class="label">影响因子</div>
       <div class="value" style="color:var(--text)">${jif != null ? jif : '-'}</div>
     </div>`;
-  h += cnCardBlock(cnHit) + csCardBlock(csHit, name);
+  h += cnCardBlock(cnHit) + csCardBlock(csHit, name) + cscdCardBlock(cdHit, name);
   if (wosSubjShort) {
     h += `<div class="result-item full" style="padding:8px 12px;text-align:left">
       <div class="label" style="margin-bottom:2px">WoS学科</div>
@@ -882,10 +1014,12 @@ function showResults(matches, source = '', unknownJournal = null, append = false
     const cnHit = findCn(rawName);
     const csHit = findCs(rawName);
     const csCand = csCandidates(rawName);
-    const zhEdge = cnHit ? '#c0392b' : ((csHit || csCand.length) ? '#1a5c9e' : '#e67e22');
+    const cdHit = findCscd(rawName);
+    const cdCand = cscdCandidates(rawName);
+    const zhEdge = cnHit ? '#c0392b' : ((csHit || csCand.length) ? '#1a5c9e' : ((cdHit || cdCand.length) ? '#1e6f5c' : '#e67e22'));
     
     let html = `<div class="result-card" style="border-left:3px solid ${zhEdge}">
-      <div class="result-title">${jn || '未知期刊'}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}</div>
+      <div class="result-title">${jn || '未知期刊'}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}</div>
       <div class="result-issn">${doi ? 'DOI: ' + doi : ''}</div>`;
     if (title) html += `<div style="font-size:12px;color:var(--sub);margin-bottom:12px;line-height:1.4">${title}</div>`;
     
@@ -902,16 +1036,20 @@ function showResults(matches, source = '', unknownJournal = null, append = false
         <div class="label">影响因子</div>
         <div class="value" style="font-size:14px;color:var(--sub)">-</div>
       </div>
-      ${cnCardBlock(cnHit)}${csCardBlock(csHit, rawName)}
+      ${cnCardBlock(cnHit)}${csCardBlock(csHit, rawName)}${cscdCardBlock(cdHit, rawName)}
     </div>
-    <div style="margin-top:12px;padding:8px 10px;background:${cnHit ? '#fdf3f2' : ((csHit || csCand.length) ? '#eef4fb' : '#fef9f0')};border-radius:8px;font-size:12px;color:${zhEdge};line-height:1.5">
+    <div style="margin-top:12px;padding:8px 10px;background:${cnHit ? '#fdf3f2' : ((csHit || csCand.length) ? '#eef4fb' : ((cdHit || cdCand.length) ? '#e9f3f0' : '#fef9f0'))};border-radius:8px;font-size:12px;color:${zhEdge};line-height:1.5">
       ${cnHit
         ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区），但属于《中文核心期刊要目总览》(2023年版) 收录期刊 —— 投稿或成果认定时可按北大核心口径使用。`
         : (csHit
           ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区），但属于南大 CSSCI ${esc(STATE.cs ? STATE.cs.version : '')}${csHit[1] === 1 ? ' 扩展版' : ' 来源期刊'} —— 认定口径请以本单位规定为准。`
           : (csCand.length
             ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区）。南大 CSSCI 目录中有 ${csCand.length} 本同名刊（见上方），若需认定收录层级请按主办单位 / 出版地进一步区分。`
-            : '该期刊暂未被新锐分区数据库收录。可能是新创期刊或尚未被索引。'))}
+            : (cdHit
+              ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区），但属于中科院 CSCD ${esc(STATE.cscd ? STATE.cscd.version : '')}${cdHit[1] === 1 ? ' 扩展库' : ' 核心库'}来源期刊 —— 理工科成果认定常单独列出该口径，具体请以本单位规定为准。`
+              : (cdCand.length
+                ? `该刊未被新锐分区数据库收录（无影响因子 / JCR 分区）。中科院 CSCD 目录中有 ${cdCand.length} 本刊名以该串开头（见上方），请补全刊名确认。`
+                : '该期刊暂未被新锐分区数据库收录。可能是新创期刊或尚未被索引。'))))}
     </div></div>`;
     
     if (source) {
@@ -1176,15 +1314,133 @@ function csTitleBadge(csHit) {
 }
 
 
-// ==================== 合并反向定位（北大 + 南大） ====================
+// ==================== 中科院 CSCD ====================
+// 与 findCn / findCs 同一套三级匹配策略。CSCD 同时含中文刊与英文刊（1046 + 455），
+// 因此比中文库多两处处理：
+//   1) 把 & 与 and 归一（如 Space: Science & Technology 两种写法都能命中）；
+//   2) 纯西文刊名把最短长度门槛提到 6 —— 4 个字母的英文串在正文里太常见，容易误报。
+function cscdKey(s) {
+  return normalizeCn(String(s || '').replace(/&amp;/gi, '&')).replace(/&/g, 'and');
+}
+
+// 命中返回行 [刊名, lib, 分类下标, 分类内序号, 总序号, lang, issn, cn]，否则 null。
+// lib 0=核心库 1=扩展库；lang 0=中文刊 1=英文刊。
+function findCscd(name) {
+  const cd = STATE.cscd;
+  if (!cd || !cd.cscdMap || !name) return null;
+  const raw = String(name);
+  const key = cscdKey(raw);
+  if (!key) return null;
+
+  // 1) 归一化后精确匹配
+  const hit = cd.cscdMap.get(key);
+  if (hit) return hit;
+
+  // 2) 剥掉尾部括号补充说明后精确匹配
+  const stripped = cscdKey(raw.replace(/[（(【\[][^）)】\]]{1,24}[）)】\]]/g, ''));
+  if (stripped && stripped !== key) {
+    const h2 = cd.cscdMap.get(stripped);
+    if (h2) return h2;
+  }
+
+  const minLen = /^[\x00-\x7f]+$/.test(key) ? 6 : 4;
+  if (key.length < minLen) return null;
+  const names = cd.names, J = cd.journals;
+
+  // 3a) 库中刊名以查询串开头：要求唯一，多了说明查询串不完整 → 不认
+  let cand = null, n = 0;
+  for (let i = 0, len = names.length; i < len; i++) {
+    const nm = names[i];
+    if (!nm || nm.length < minLen) continue;
+    if (nm.startsWith(key)) { cand = J[i]; if (++n > 1) return null; }
+  }
+  if (n === 1) return cand;
+
+  // 3b) 查询串以库中刊名开头（尾部有残留）：取最长匹配，并列则不认
+  let best = null, bestLen = 0, tie = false;
+  for (let i = 0, len = names.length; i < len; i++) {
+    const nm = names[i];
+    if (!nm || nm.length < minLen) continue;
+    if (key.startsWith(nm)) {
+      if (nm.length > bestLen) { best = J[i]; bestLen = nm.length; tie = false; }
+      else if (nm.length === bestLen) tie = true;
+    }
+  }
+  return (best && !tie) ? best : null;
+}
+
+// CSCD 目录内刊名唯一（无重名），但查询串过短时会同时前缀命中多本。
+// 此时报「未收录」属事实性误报，改为列出候选。候选超过 10 本说明查询太宽泛，不作提示。
+function cscdCandidates(name) {
+  const cd = STATE.cscd;
+  if (!cd || !cd.cscdMap || !name) return [];
+  const key = cscdKey(name);
+  if (!key || key.length < 4) return [];
+  if (cd.cscdMap.get(key)) return [];       // 已能精确命中，无需候选
+  const out = [];
+  for (let i = 0, len = cd.journals.length; i < len && out.length <= 10; i++) {
+    const nm = cd.names[i];
+    if (nm && nm.length > key.length && nm.startsWith(key)) out.push(cd.journals[i]);
+  }
+  return (out.length > 1 && out.length <= 10) ? out : [];
+}
+
+// 卡片内的 CSCD 信息块（PDF / DOI / 刊名搜索共用）
+function cscdCardBlock(cscdHit, name) {
+  if (!STATE.cscd) return '';   // 数据未就绪时不显示，避免误报「未收录」
+  const cd = STATE.cscd;
+  if (!cscdHit) {
+    const cands = cscdCandidates(name);
+    if (cands.length) {
+      const list = cands.map(r => {
+        const lang = r[5] === 1 ? '英文刊' : '中文刊';
+        return `<div style="margin-top:3px">· <b>${esc(r[0])}</b> —— ${r[1] === 1 ? 'CSCD 扩展库' : 'CSCD 核心库'} · ${esc(lang)}（总序号 ${r[4]}）</div>`;
+      }).join('');
+      return `<div class="result-item full" style="padding:8px 12px;text-align:left">
+      <div class="label" style="margin-bottom:2px">中科院 CSCD</div>
+      <div class="value" style="font-size:12px;font-weight:400;color:#4a7c6f">⚠ 目录中有 ${cands.length} 本刊名以该串开头，请补全刊名确认：</div>
+      <div style="font-size:11px;color:#4a7c6f;font-weight:400;line-height:1.6">${list}</div>
+    </div>`;
+    }
+    return `<div class="result-item full" style="padding:8px 12px;text-align:left">
+      <div class="label" style="margin-bottom:2px">中科院 CSCD</div>
+      <div class="value" style="font-size:12px;font-weight:400;color:#bbb">未收录（非 CSCD 来源期刊）</div>
+    </div>`;
+  }
+  const isExt = cscdHit[1] === 1;
+  const lang = cscdHit[5] === 1 ? '英文刊' : '中文刊';
+  const cls = cscdClsLabel(cd.cls[cscdHit[2]]);
+  const cnt = (cd.clsCounts[isExt ? 1 : 0][cscdHit[2]]) || 0;
+  const tot = isExt ? cd.extTotal : cd.coreTotal;
+  const meta = [cscdHit[6] ? 'ISSN ' + cscdHit[6] : '', cscdHit[7] ? 'CN ' + cscdHit[7] : ''].filter(Boolean).join(' · ');
+
+  return `<div class="result-item full" style="padding:9px 12px;text-align:left;background:${isExt ? '#eef5f2' : '#e6f2ee'};border-radius:8px">
+      <div class="label" style="margin-bottom:3px">中科院 CSCD</div>
+      <div class="value" style="font-size:14px;font-weight:700;color:#1e6f5c">${isExt ? '◻' : '✅'} CSCD ${isExt ? '扩展库' : '核心库'} ${esc(cd.version)} · ${esc(cls)} · ${lang}</div>
+      <div style="font-size:11px;color:#6f9c90;margin-top:3px;font-weight:400">
+        ${meta ? esc(meta) + ' &nbsp;·&nbsp; ' : ''}分类内序号 ${cscdHit[3]} / ${cnt} &nbsp;·&nbsp; 总序号 ${cscdHit[4]} / ${cd.total}${isExt ? ' &nbsp;·&nbsp; 扩展库非核心库，认定口径请以本单位规定为准' : ''}
+      </div>
+    </div>`;
+}
+
+// 标题旁的 CSCD 徽标
+function cscdTitleBadge(cscdHit) {
+  if (!cscdHit) return '';
+  return cscdHit[1] === 1
+    ? '<span class="badge-cscd-ext" style="font-size:10px;padding:2px 6px;margin-left:4px">CSCD扩展</span>'
+    : '<span class="badge-cscd" style="font-size:10px;padding:2px 6px;margin-left:4px">CSCD核心</span>';
+}
+
+
+// ==================== 合并反向定位（北大 + 南大 + CSCD） ====================
 // 两张刊名表合一后扫正文：一次扫完取「位置最靠前 + 名字最长」的那个，
 // 再回头分别判它属于北大核心 / 南大核心的哪一档。
 // 合并而不是各扫各的，是为了避免两边各报一个不同刊物。
 let zhCandCache = null, zhCandStamp = '';
 
 function zhCandidates() {
-  const cn = STATE.cn, cs = STATE.cs;
-  const stamp = (cn ? cn.total : 0) + '|' + (cs ? cs.total + '/' + cs.extTotal : 0);
+  const cn = STATE.cn, cs = STATE.cs, cd = STATE.cscd;
+  const stamp = (cn ? cn.total : 0) + '|' + (cs ? cs.total + '/' + cs.extTotal : 0) + '|' + (cd ? cd.total : 0);
   if (zhCandCache && zhCandStamp === stamp) return zhCandCache;
 
   const normList = [], rawList = [], seen = new Set();
@@ -1198,6 +1454,17 @@ function zhCandidates() {
   };
   if (cn) push(cn.names, cn.journals.map(r => r[0]));
   if (cs) push(cs.names, cs.journals.map(r => r[0]));
+  // CSCD 只并入中文刊名：455 个英文刊名归一化后是纯西文串（如 droplet、aggregate），
+  // 中文 PDF 的英文摘要里会自然出现，混进来会误命中。英文刊仍可经 DOI / 刊名模式单独查。
+  if (cd) {
+    const n2 = [], r2 = [];
+    cd.journals.forEach(r => {
+      const nm = r[0] || '';
+      if (!/[\u4e00-\u9fa5]/.test(nm)) return;
+      n2.push(cscdKey(nm)); r2.push(nm);
+    });
+    push(n2, r2);
+  }
 
   zhCandCache = { norms: normList, raws: rawList };
   zhCandStamp = stamp;
@@ -1246,21 +1513,21 @@ function zhFindInText(text) {
   return null;
 }
 
-// 正文兜底识别（北大 + 南大联合）。命中则直接出结果并返回 true。
+// 正文兜底识别（北大 + 南大 + CSCD 联合）。命中则直接出结果并返回 true。
 function zhTextFallback(info, source, appendMode) {
-  if (!info || (!STATE.cn && !STATE.cs)) return false;
+  if (!info || (!STATE.cn && !STATE.cs && !STATE.cscd)) return false;
   const text = info.headText || info.firstPageText || '';
   if (!text) return false;
 
   const nm = zhFindInText(text);
   if (!nm) return false;
-  const cnHit = findCn(nm), csHit = findCs(nm);
-  if (!cnHit && !csHit && !csCandidates(nm).length) return false;
+  const cnHit = findCn(nm), csHit = findCs(nm), cdHit = findCscd(nm);
+  if (!cnHit && !csHit && !cdHit && !csCandidates(nm).length && !cscdCandidates(nm).length) return false;
 
   const srcX = `PDF正文识别: ${esc(nm)}`;
   const mX = searchJournals(nm);
 
-  if (mX.length) {                       // 新锐库里也有 → 正常卡片（已含两个中文核心块）
+  if (mX.length) {                       // 新锐库里也有 → 正常卡片（已含三个中文库块）
     if (info.title) source += `<br>${esc(info.title)}`;
     if (appendMode) {
       $('results').insertAdjacentHTML('beforeend',
@@ -1273,11 +1540,11 @@ function zhTextFallback(info, source, appendMode) {
 
   // 新锐库里没有，但至少一个中文库有 → 直接出中文卡片，避免误报「未收录」
   if (appendMode) {
-    const edge = cnHit ? '#c0392b' : '#1a5c9e';
+    const edge = cnHit ? '#c0392b' : (csHit ? '#1a5c9e' : '#1e6f5c');
     $('results').insertAdjacentHTML('beforeend',
       `<div class="result-card" style="border-left:3px solid ${edge};margin-bottom:12px">
-        <div class="result-title">${esc(nm)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}</div>
-        <div class="result-grid">${cnCardBlock(cnHit)}${csCardBlock(csHit, nm)}</div>
+        <div class="result-title">${esc(nm)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}</div>
+        <div class="result-grid">${cnCardBlock(cnHit)}${csCardBlock(csHit, nm)}${cscdCardBlock(cdHit, nm)}</div>
       </div>`);
   } else {
     showResults([], srcX, { journal: nm, title: info.title });
@@ -1318,6 +1585,70 @@ function searchCsJournals(query, limit = 40) {
     if (starts.length >= limit) break;
   }
   return starts.concat(contains).slice(0, limit);
+}
+
+// ==================== 中科院 CSCD 搜索 / 卡片 ====================
+function searchCscdJournals(query, limit = 40) {
+  const cd = STATE.cscd;
+  if (!cd || !query) return [];
+  const q = cscdKey(query);
+  if (!q) return [];
+  const names = cd.names, J = cd.journals;
+  const starts = [], contains = [];
+  for (let i = 0, n = J.length; i < n; i++) {
+    const p = names[i].indexOf(q);
+    if (p === 0) starts.push(J[i]);
+    else if (p > 0) contains.push(J[i]);
+    if (starts.length >= limit) break;
+  }
+  return starts.concat(contains).slice(0, limit);
+}
+
+// CSCD 行 = [刊名, lib, 分类下标, 分类内序号, 总序号, lang, issn, cn]
+// lib 0=核心库 1=扩展库；lang 0=中文刊 1=英文刊
+function renderCscdCard(m, extraClass = '') {
+  const cd = STATE.cscd;
+  const [name, lib, ci, idx, no, lang, issn, cn] = m;
+  const isExt = lib === 1;
+  const cls = cscdClsLabel(cd.cls[ci]);
+  const cnt = (cd.clsCounts[isExt ? 1 : 0][ci]) || 0;
+  const tot = isExt ? cd.extTotal : cd.coreTotal;
+
+  return `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
+    <div class="result-title">${esc(name)}</div>
+    <div class="result-issn">${isExt
+      ? '<span class="badge-cscd-ext">CSCD 扩展库</span><span class="badge-cscd-ext" style="background:#f1f7f5;color:#7fa79d">2025-2026</span>'
+      : '<span class="badge-cscd">CSCD 核心库</span><span class="badge-cscd-ext">2025-2026</span>'}${lang === 1
+      ? '<span class="badge-cscd-ext" style="background:#fff;border:1px solid #cfe3dd;color:#5f8b80">英文刊</span>'
+      : ''}</div>
+    <div class="result-grid">
+      <div class="result-item full">
+        <div class="label">学科分类</div>
+        <div class="value" style="font-size:16px;color:var(--text)">${esc(cls)}</div>
+      </div>
+      <div class="result-item">
+        <div class="label">分类内序号</div>
+        <div class="value" style="color:var(--text);font-size:16px">${idx}<span style="font-size:12px;color:#aaa"> / ${cnt}</span></div>
+      </div>
+      <div class="result-item">
+        <div class="label">库内序号</div>
+        <div class="value" style="color:var(--text);font-size:16px">${no}<span style="font-size:12px;color:#aaa"> / ${tot}</span></div>
+      </div>
+      <div class="result-item full">
+        <div class="label" style="margin-bottom:2px">刊物编号</div>
+        <div class="value" style="font-size:12px;font-weight:400;color:var(--sub)">${issn ? 'ISSN ' + esc(issn) : '<span style="color:#bbb">无 ISSN 记录</span>'}${cn ? ' &nbsp;·&nbsp; CN ' + esc(cn) : ''}</div>
+      </div>
+      <div class="result-item full">
+        <div class="label" style="margin-bottom:2px">收录层级</div>
+        <div class="value" style="font-size:12px;font-weight:400;color:var(--sub)">${isExt
+          ? 'CSCD 扩展库（核心库之外，认定口径以本单位规定为准）'
+          : 'CSCD 核心库（C 库，以备注栏 C 为标记）'}</div>
+      </div>
+    </div>
+    <div class="cn-tip cscd">${isExt
+      ? '◻ 该刊被 CSCD(2025-2026) 扩展库收录'
+      : '✅ 该刊被 CSCD(2025-2026) 核心库收录 · 学科分类取自 CN 刊号分类号，仅供参考'}</div>
+  </div>`;
 }
 
 // CSSCI 行 = [刊名, lib, 学科下标, 学科内序号, 总序号]，lib 0=来源期刊 1=扩展版
@@ -1393,14 +1724,19 @@ function renderCnCard(m, extraClass = '') {
 function showCnResults(list, source = '', query = '', append = false) {
   const el = $('results');
   const isCs = STATE.cnLib === 'cs';
-  const cardFn = isCs ? renderCsCard : renderCnCard;
-  const accent = isCs ? '#1a5c9e' : '#c0392b';
+  const isCscd = STATE.cnLib === 'cscd';
+  const cardFn = isCscd ? renderCscdCard : (isCs ? renderCsCard : renderCnCard);
+  const accent = isCscd ? '#1e6f5c' : (isCs ? '#1a5c9e' : '#c0392b');
   if (!append) el.innerHTML = '';
   $('emptyState').classList.add('hidden');
 
   if (!list.length) {
     if (append) return;
-    if (isCs) {
+    if (isCscd) {
+      const cd = STATE.cscd;
+      const tot = cd ? `${cd.total} 种（核心库 ${cd.coreTotal} + 扩展库 ${cd.extTotal}）` : '1501 种';
+      el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到「${esc(query)}」<br>CSCD(2025-2026) 共 ${tot}<br><span style="font-size:12px;color:#aaa">可尝试期刊简称，如"岩土""材料"；英文刊请输入英文刊名</span></div></div>`;
+    } else if (isCs) {
       const cs = STATE.cs;
       const tot = cs ? `${cs.total} 种来源期刊 + ${cs.extTotal} 种扩展版` : '935 种';
       el.innerHTML = `<div class="state"><div class="icon">😕</div><div class="msg">未找到「${esc(query)}」<br>CSSCI(2025-2026) 共 ${tot}<br><span style="font-size:12px;color:#aaa">可尝试期刊简称，如"经济""法学"</span></div></div>`;
@@ -1449,7 +1785,20 @@ function showCnResults(list, source = '', query = '', append = false) {
 function showCnSuggestions(list) {
   const el = $('cnSuggestions');
   if (!list.length) { el.classList.remove('show'); el.innerHTML = ''; return; }
-  if (STATE.cnLib === 'cs') {
+  if (STATE.cnLib === 'cscd') {
+    const cd = STATE.cscd;
+    el.innerHTML = list.map((j, i) => {
+      const isExt = j[1] === 1;
+      const badge = isExt
+        ? '<span class="badge-cscd-ext">CSCD扩展</span>'
+        : '<span class="badge-cscd">CSCD核心</span>';
+      const cls = cd ? cscdClsLabel(cd.cls[j[2]]) : '';
+      return `<div class="sug-item" data-idx="${i}">
+        <div class="sug-name">${esc(j[0])}</div>
+        <div class="sug-meta">${badge}<span style="color:#888;font-size:11px">${esc(cls)} · ${j[5] === 1 ? '英文刊' : '中文刊'}</span></div>
+      </div>`;
+    }).join('');
+  } else if (STATE.cnLib === 'cs') {
     const cs = STATE.cs;
     el.innerHTML = list.map((j, i) => {
       const isExt = j[1] === 1;
@@ -1475,13 +1824,30 @@ function showCnSuggestions(list) {
   el.classList.add('show');
 }
 
-// 按学科浏览。北大核心：7 编分组 148 学科；CSSCI：来源期刊/扩展版两组，各 26 学科
+// 按学科浏览。北大核心：7 编分组 148 学科；CSSCI：来源期刊/扩展版两组，各 26 学科；
+// CSCD：核心库/扩展库两组，各按 CN 刊号分类号分组（官方目录不公开学科类目，故用刊号分类，仅供参考）
 function renderCnBrowse() {
   const area = $('cnBrowseArea');
   area.dataset.rendered = '';
   let h = '';
 
-  if (STATE.cnLib === 'cs') {
+  if (STATE.cnLib === 'cscd') {
+    const cd = STATE.cscd;
+    if (!cd) { area.innerHTML = '<div class="cn-disc-item" style="cursor:default;color:#999">数据加载中…</div>'; return; }
+    const grp = (title, lib) => {
+      let inner = '';
+      cd.cls.forEach((c, ci) => {
+        const n = cd.clsCounts[lib][ci] || 0;
+        if (!n) return;
+        inner += `<div class="cn-disc-item" data-cscdcls="${ci}" data-cscdlib="${lib}" data-cscdhead="${esc(title)}">
+          <span>${esc(cscdClsLabel(c))}</span><span class="cn-disc-count">${n} 种</span>
+        </div>`;
+      });
+      if (inner) h += `<div class="cn-disc-head cscd">${esc(title)}</div>` + inner;
+    };
+    grp(`CSCD 核心库（${cd.coreTotal} 种）`, 0);
+    grp(`CSCD 扩展库（${cd.extTotal} 种）`, 1);
+  } else if (STATE.cnLib === 'cs') {
     const cs = STATE.cs;
     if (!cs) { area.innerHTML = '<div class="cn-disc-item" style="cursor:default;color:#999">数据加载中…</div>'; return; }
     const grp = (title, discList, counts, lib) => {
@@ -1534,6 +1900,18 @@ function showCsDisc(di, lib, head) {
   const list = cs.journals.filter(j => j[1] === lib && j[2] === di);
   const disc = lib === 1 ? (cs.extDiscs[di] || '') : (cs.discs[di] || '');
   const source = `📚 <b>${esc(disc)}</b> · 共 ${list.length} 种<br><span style="color:#aaa">${esc(head)} · CSSCI ${esc(cs.version)}</span>`;
+  $('cnBrowseArea').classList.add('hidden');
+  $('cnSuggestions').classList.remove('show');
+  showCnResults(list, source);
+}
+
+// CSCD 按刊号分类：lib 0=核心库 1=扩展库
+function showCscdDisc(ci, lib, head) {
+  const cd = STATE.cscd;
+  if (!cd) return;
+  const list = cd.journals.filter(j => j[1] === lib && j[2] === ci);
+  const cls = cscdClsLabel(cd.cls[ci]);
+  const source = `📚 <b>${esc(cls)}</b> · 共 ${list.length} 种<br><span style="color:#aaa">${esc(head)} · CSCD ${esc(cd.version)} · 分类取自 CN 刊号</span>`;
   $('cnBrowseArea').classList.add('hidden');
   $('cnSuggestions').classList.remove('show');
   showCnResults(list, source);
@@ -1665,13 +2043,15 @@ let cnSuggIndex = -1;
 
 // 当前库是否就绪
 function zhLibReady() {
+  if (STATE.cnLib === 'cscd') return STATE.cscdLoaded;
   return STATE.cnLib === 'cs' ? STATE.csLoaded : STATE.cnLoaded;
 }
 function zhSearch(q, limit) {
+  if (STATE.cnLib === 'cscd') return searchCscdJournals(q, limit);
   return STATE.cnLib === 'cs' ? searchCsJournals(q, limit) : searchCnJournals(q, limit);
 }
 
-// 库切换（北大核心 / 南大核心 CSSCI）
+// 库切换（北大核心 / 南大核心 CSSCI / 中科院 CSCD）
 $$('#libSwitch button').forEach(btn => {
   btn.addEventListener('click', () => {
     STATE.cnLib = btn.dataset.lib;
@@ -1683,9 +2063,11 @@ $$('#libSwitch button').forEach(btn => {
     $('results').innerHTML = '';
     $('emptyState').classList.remove('hidden');
     const inp = $('cnInput');
-    inp.placeholder = STATE.cnLib === 'cs'
-      ? '输入中文期刊名，如：经济研究'
-      : '输入中文期刊名，如：岩土工程学报';
+    inp.placeholder = STATE.cnLib === 'cscd'
+      ? '输入中文 / 英文期刊名，如：岩土工程学报'
+      : (STATE.cnLib === 'cs'
+        ? '输入中文期刊名，如：经济研究'
+        : '输入中文期刊名，如：岩土工程学报');
     inp.value = '';
     $('cnClearBtn').classList.add('hidden');
     updateZhStat();
@@ -1740,9 +2122,11 @@ $('cnInput').addEventListener('keydown', function(e) {
     if (!q) return;
     if (!zhLibReady()) { showToast('中文收录数据加载中，请稍候'); return; }
     const res = zhSearch(q, 200);
-    const head = STATE.cnLib === 'cs'
-      ? `🔍 <b>${esc(q)}</b> · CSSCI ${esc(STATE.cs ? STATE.cs.version : '')}`
-      : `🔍 <b>${esc(q)}</b> · 北大核心 2023 版`;
+    const head = STATE.cnLib === 'cscd'
+      ? `🔍 <b>${esc(q)}</b> · CSCD ${esc(STATE.cscd ? STATE.cscd.version : '')}`
+      : (STATE.cnLib === 'cs'
+        ? `🔍 <b>${esc(q)}</b> · CSSCI ${esc(STATE.cs ? STATE.cs.version : '')}`
+        : `🔍 <b>${esc(q)}</b> · 北大核心 2023 版`);
     showCnResults(res, res.length ? head : '', q);
     sugEl.classList.remove('show');
   }
@@ -1771,6 +2155,10 @@ $('cnBrowseBtn').addEventListener('click', () => {
 $('cnBrowseArea').addEventListener('click', e => {
   const item = e.target.closest('.cn-disc-item');
   if (!item) return;
+  if (item.dataset.cscdcls !== undefined) {
+    showCscdDisc(parseInt(item.dataset.cscdcls, 10), parseInt(item.dataset.cscdlib, 10), item.dataset.cscdhead || '');
+    return;
+  }
   if (item.dataset.csdisc !== undefined) {
     showCsDisc(parseInt(item.dataset.csdisc, 10), parseInt(item.dataset.cslib, 10), item.dataset.cshead || '');
     return;
@@ -1949,7 +2337,7 @@ async function processPdf(file, idx = 1, total = 1) {
             <div style="font-size:15px;font-weight:600;margin-bottom:6px">没能确认这篇 PDF 的刊名</div>
             <div style="font-size:13px;color:var(--sub);line-height:1.6">
               ${readChars
-                ? `已读到 PDF 的文字（页眉页脚共 ${readChars} 字），但没能在北大核心 2023 年版的 1987 种、以及南大 CSSCI 的 935 种名单里找到对应刊名。`
+                ? `已读到 PDF 的文字（页眉页脚共 ${readChars} 字），但没能在北大核心 2023 年版的 1987 种、南大 CSSCI 的 935 种、以及中科院 CSCD 的 1501 种名单里找到对应刊名。`
                 : `这个 PDF 里没有可提取的文字（多半是扫描件／图片版），页眉页脚读不出内容。`}<br><br>
               <span style="font-weight:500;color:var(--text)">可能的原因：</span><br>
               &nbsp;1.&nbsp; 该刊<span style="font-weight:500">既非北大中文核心，也不属于南大 CSSCI</span>（行业刊、内部刊等）<br>
@@ -2000,12 +2388,13 @@ async function processPdf(file, idx = 1, total = 1) {
           const rawJ = crossrefInfo.journal || crossrefInfo.title || '未知期刊';
           const cnHitA = findCn(crossrefInfo.journal || '');
           const csHitA = findCs(crossrefInfo.journal || '');
-          const edgeA = cnHitA ? '#c0392b' : (csHitA ? '#1a5c9e' : '#e67e22');
+          const cdHitA = findCscd(crossrefInfo.journal || '');
+          const edgeA = cnHitA ? '#c0392b' : (csHitA ? '#1a5c9e' : (cdHitA ? '#1e6f5c' : '#e67e22'));
           $('results').insertAdjacentHTML('beforeend',
             `<div class="result-card" style="border-left:3px solid ${edgeA};margin-bottom:12px">
-              <div class="result-title">${esc(rawJ)}${cnTitleBadge(cnHitA)}${csTitleBadge(csHitA)}</div>
+              <div class="result-title">${esc(rawJ)}${cnTitleBadge(cnHitA)}${csTitleBadge(csHitA)}${cscdTitleBadge(cdHitA)}</div>
               <div class="result-grid">
-                ${cnCardBlock(cnHitA)}${csCardBlock(csHitA, rawJ)}
+                ${cnCardBlock(cnHitA)}${csCardBlock(csHitA, rawJ)}${cscdCardBlock(cdHitA, rawJ)}
               </div>
             </div>`);
         } else {
@@ -2025,13 +2414,14 @@ async function processPdf(file, idx = 1, total = 1) {
       if (zhTextFallback(info, source, appendMode)) return;
       const cnHitB = findCn(info.journal);
       const csHitB = findCs(info.journal);
-      const edgeB = cnHitB ? '#c0392b' : (csHitB ? '#1a5c9e' : '#e67e22');
+      const cdHitB = findCscd(info.journal);
+      const edgeB = cnHitB ? '#c0392b' : (csHitB ? '#1a5c9e' : (cdHitB ? '#1e6f5c' : '#e67e22'));
       if (appendMode) {
         $('results').insertAdjacentHTML('beforeend',
           `<div class="result-card" style="border-left:3px solid ${edgeB};margin-bottom:12px">
-            <div class="result-title">${esc(info.journal || info.title || '未知期刊')}${cnTitleBadge(cnHitB)}${csTitleBadge(csHitB)}</div>
+            <div class="result-title">${esc(info.journal || info.title || '未知期刊')}${cnTitleBadge(cnHitB)}${csTitleBadge(csHitB)}${cscdTitleBadge(cdHitB)}</div>
             <div class="result-grid">
-              ${cnCardBlock(cnHitB)}${csCardBlock(csHitB, info.journal)}
+              ${cnCardBlock(cnHitB)}${csCardBlock(csHitB, info.journal)}${cscdCardBlock(cdHitB, info.journal)}
             </div>
           </div>`);
       } else {
@@ -2052,13 +2442,14 @@ async function processPdf(file, idx = 1, total = 1) {
   if (!matches.length) {
     const cnHitC = findCn(info.journal);
     const csHitC = findCs(info.journal);
-    const edgeC = cnHitC ? '#c0392b' : (csHitC ? '#1a5c9e' : 'var(--border)');
+    const cdHitC = findCscd(info.journal);
+    const edgeC = cnHitC ? '#c0392b' : (csHitC ? '#1a5c9e' : (cdHitC ? '#1e6f5c' : 'var(--border)'));
     if (appendMode) {
       $('results').insertAdjacentHTML('beforeend',
         `<div class="result-card" style="border-left:3px solid ${edgeC};margin-bottom:12px">
-          <div class="result-title">${esc(info.journal || info.title || '未识别期刊')}${cnTitleBadge(cnHitC)}${csTitleBadge(csHitC)}</div>
+          <div class="result-title">${esc(info.journal || info.title || '未识别期刊')}${cnTitleBadge(cnHitC)}${csTitleBadge(csHitC)}${cscdTitleBadge(cdHitC)}</div>
           <div class="result-grid">
-            ${cnCardBlock(cnHitC)}${csCardBlock(csHitC, info.journal)}
+            ${cnCardBlock(cnHitC)}${csCardBlock(csHitC, info.journal)}${cscdCardBlock(cdHitC, info.journal)}
           </div>
         </div>`);
     } else {
