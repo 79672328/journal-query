@@ -144,6 +144,43 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .lib-switch button.active[data-lib="cs"]{border-color:#1a5c9e;color:#1a5c9e;background:#eef4fb}
 .lib-switch button.active[data-lib="cscd"]{border-color:#1e6f5c;color:#1e6f5c;background:#e9f3f0}
 
+/* ===== 中科院分区（2025 升级版）—— 独立视觉体系：紫罗兰色系 =====
+   刻意与新锐分区（灰蓝）、JCR分区（绿）拉开色相，避免混淆。
+   卡片内以独立区块 + 独立底色 + 左侧色条呈现，标题栏挂紫色徽标。 */
+.badge-cas{display:inline-block;background:#6b4ea8;color:#fff;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:600;margin:0 2px 0 0;vertical-align:middle}
+.badge-cas-top{display:inline-block;background:#f3eefc;color:#6b4ea8;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:500;margin:0 4px 0 0;vertical-align:middle}
+
+/* 区块容器：整块给出中科院口径，与上方新锐/JCR 区隔 */
+.cas-block{margin-top:12px;border:1.5px solid #ded2f5;border-radius:10px;overflow:hidden;background:#faf7ff;text-align:left}
+.cas-block-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;background:#6b4ea8;color:#fff}
+.cas-block-head .t{font-size:12px;font-weight:600;letter-spacing:.3px}
+.cas-block-head .v{font-size:10px;font-weight:400;opacity:.85}
+.cas-block-body{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#e8dff8}
+.cas-cell{background:#faf7ff;padding:9px 12px;text-align:left}
+.cas-cell.full{grid-column:1/-1}
+.cas-cell .k{font-size:10px;color:#9b8ec0;letter-spacing:.4px;margin-bottom:3px}
+.cas-cell .v{font-size:14px;font-weight:600;color:var(--text);line-height:1.35}
+.cas-zone{display:inline-block;font-size:17px;font-weight:700;padding:4px 16px;border-radius:6px;color:#fff;letter-spacing:.5px}
+.cas-z1{background:#b3261e}
+.cas-z2{background:#c77700}
+.cas-z3{background:#3d7d3d}
+.cas-z4{background:#5b6b7c}
+.cas-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.cas-tag{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;background:#f3eefc;color:#6b4ea8;border:1px solid #ded2f5}
+.cas-tag.top{background:#6b4ea8;color:#fff;border-color:#6b4ea8;font-weight:600}
+.cas-tag.oa{background:#eaf6ee;color:#2f7d4f;border-color:#cbe6d6}
+.cas-tag.giant{background:#fdf2e6;color:#9c6212;border-color:#f0dcbe}
+.cas-foot{padding:7px 12px;background:#f4f0fc;font-size:11px;color:#7b6ba8;line-height:1.5;border-top:1px solid #e8dff8}
+/* 「新锐库有、中科院库无」时的淡色说明条 */
+.cas-miss{margin-top:12px;padding:8px 12px;background:#f6f4fa;border-radius:8px;font-size:12px;color:#8a8296;line-height:1.5;border-left:3px solid #cfc6de;text-align:left}
+/* 分区图例 */
+.cas-zlegend{display:flex;align-items:center;gap:10px;margin-top:8px;padding:6px 10px;background:#faf7ff;border-radius:8px;font-size:11px;color:#6b4ea8}
+.cas-zlegend span{display:inline-flex;align-items:center;gap:4px}
+.cas-zlegend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.cas-zlegend i.cas-z1{background:#b3261e}.cas-zlegend i.cas-z2{background:#c77700}
+.cas-zlegend i.cas-z3{background:#3d7d3d}.cas-zlegend i.cas-z4{background:#5b6b7c}
+@media (max-width:360px){ .cas-block-body{grid-template-columns:1fr} }
+
 </style>
 </head>
 <body>
@@ -152,7 +189,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     <div class="header-icon">JQ</div>
     <div>
       <h1>新锐期刊分区查询</h1>
-      <div class="sub">影响因子 &middot; 新锐分区 &middot; 北大核心 &middot; 南大核心 CSSCI &middot; 中科院 CSCD &middot; EI &middot; 2026</div>
+      <div class="sub">中科院分区 2025 &middot; 影响因子 &middot; 新锐分区 &middot; 北大核心 &middot; 南大核心 CSSCI &middot; 中科院 CSCD &middot; EI</div>
     </div>
   </div>
 
@@ -162,6 +199,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     <button class="mode-btn" data-mode="doi">DOI</button>
     <button class="mode-btn" data-mode="pdf">PDF上传</button>
     <button class="mode-btn" data-mode="cn">中文收录</button>
+    <button class="mode-btn" data-mode="cas">中科院分区</button>
   </div>
 
   <!-- Input card -->
@@ -184,8 +222,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     </div>
 
     <!-- DOI search -->
-    <div id="modeDoi" class="hidden">
-      <div class="input-row">
+    <div id="modeDoi" class="hidden">      <div class="input-row">
         <input type="text" id="doiInput" placeholder="输入DOI或粘贴论文链接...">
         <button id="doiBtn">查询</button>
       </div>
@@ -197,7 +234,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <div class="upload-area" id="uploadArea">
         <div class="icon">📄</div>
         <div class="text" id="uploadText">点击或拖拽上传PDF</div>
-        <div class="hint">自动提取期刊信息，支持80MB内PDF，可多选<br>结果同时给出新锐分区、JCR分区，以及北大核心 / 南大核心 CSSCI / 中科院 CSCD / EI Compendex 收录情况</div>
+        <div class="hint">自动提取期刊信息，支持80MB内PDF，可多选<br>结果同时给出<b>中科院分区（2025）</b>、新锐分区、JCR分区，以及北大核心 / 南大核心 CSSCI / 中科院 CSCD / EI Compendex 收录情况</div>
       </div>
       <div id="wxUpload" style="display:none;margin-top:10px">
         <div style="text-align:center;font-size:11px;color:#999;margin-bottom:8px">— 微信用户推荐 —</div>
@@ -226,6 +263,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <div class="suggestions" id="cnSuggestions"></div>
       <div class="cn-stat" id="cnStat">北大《中文核心期刊要目总览》2023年版 · 7 编 148 个学科</div>
       <div class="cn-note" id="cnNote"></div>
+    </div>
+
+    <!-- 中科院分区（2025 升级版）浏览 / 查询 -->
+    <div id="modeCas" class="hidden">
+      <div class="input-row" style="position:relative;margin-bottom:6px">
+        <input type="text" id="casInput" placeholder="输入期刊名或 ISSN，如：Cement and Concrete Research" autocomplete="off">
+        <button id="casClearBtn" class="hidden" style="background:#999;padding:0 14px">✕</button>
+        <button id="casCatsBtn" style="background:none;border:1px solid #6b4ea8;color:#6b4ea8;padding:0 12px;font-size:12px;white-space:nowrap">按大类</button>
+      </div>
+      <div id="casCatsArea" class="cn-browse hidden" style="margin-top:8px;border-color:#ded2f5"></div>
+      <div class="suggestions" id="casSuggestions"></div>
+      <div class="cas-zlegend">
+        <span><i class="cas-z1"></i>1 区</span><span><i class="cas-z2"></i>2 区</span>
+        <span><i class="cas-z3"></i>3 区</span><span><i class="cas-z4"></i>4 区</span>
+        <span style="margin-left:auto;color:#9b8ec0">升级版 · 大类分区口径</span>
+      </div>
+      <div class="cn-stat" id="casStat">2025 年中科院期刊分区表（升级版）· 21 个大类 · 加载中…</div>
+      <div class="cn-note" id="casNote"></div>
     </div>
   </div>
 
@@ -315,6 +370,9 @@ const STATE = {
   // EI Compendex（Elsevier 源列表 2026-05-01 版：连续出版物 + 中文刊专表 + 停止收录）
   ei: null,          // {serials, cn, disc, subj, langs, byIssn, byKey, cnByKey, discByKey, ...}
   eiLoaded: false,
+  // 中科院分区（2025 年升级版：22 个大类，21730 种）
+  cas: null,         // {journals, names, casMap, issnMap, cats, catCounts, total, version, src}
+  casLoaded: false,
   cnLib: 'cn'        // 「中文收录」页当前浏览的库: cn | cs | cscd | ei
 };
 
@@ -344,6 +402,8 @@ async function loadData() {
     loadCscdData();
     // EI Compendex（Elsevier 源列表）独立加载
     loadEiData();
+    // 中科院分区 2025 升级版独立加载
+    loadCasData();
   } catch(e) {
     console.error('Data load error:', e);
     $('stats').textContent = '数据加载失败，请刷新重试';
@@ -655,14 +715,74 @@ function eiKey(s) {
     .replace(/[^a-z0-9\u4e00-\u9fa5\u3040-\u30ff]+/g, '');
 }
 
+// ==================== 中科院分区 2025 数据加载 ====================
+// 与主库 journal_data.json.gz 完全解耦：独立文件、独立失败域。
+// 这样做的理由和中核库一致 —— 新分区 667KB，不该拖慢首屏主库的可用时间；
+// 且它挂了也不该影响刊名/DOI 的基本查询。
+async function loadCasData() {
+  try {
+    const resp = await fetch('cas_data.json.gz');
+    if (!resp.ok) throw new Error('CAS data fetch failed: ' + resp.status);
+    const ds = new DecompressionStream('gzip');
+    const stream = resp.body.pipeThrough(ds);
+    const d = JSON.parse(await new Response(stream).text());
+
+    const js = d.journals || [];
+    // 双索引：刊名归一化键、ISSN（去连字符大写，8 位校验）
+    const casMap = new Map();
+    const issnMap = new Map();
+    const names = new Array(js.length);
+
+    for (let i = 0; i < js.length; i++) {
+      const row = js[i];
+      const k = casKey(row[0] || '');
+      names[i] = k;
+      if (k && !casMap.has(k)) casMap.set(k, i);
+      for (const iss of [row[5], row[6]]) {
+        const kk = String(iss || '').replace(/[^0-9Xx]/g, '').toUpperCase();
+        if (kk.length === 8 && !issnMap.has(kk)) issnMap.set(kk, i);
+      }
+    }
+
+    // 大类计数，供「中文收录」页的浏览视图复用
+    const catCounts = {};
+    for (const r of js) {
+      const c = r[1] || '未分类';
+      catCounts[c] = (catCounts[c] || 0) + 1;
+    }
+
+    STATE.cas = {
+      journals: js,
+      names: names,
+      casMap: casMap,
+      issnMap: issnMap,
+      cats: d.cats || [],
+      catCounts: catCounts,
+      total: js.length,
+      version: d.v || '2025',
+      src: d.updated || ''
+    };
+    STATE.casLoaded = true;
+    if (typeof updateCasStat === 'function') updateCasStat();
+
+    // 数据晚到：若用户已经查过，用同一套入参重绘，把分区区块补上
+    if (STATE.lastResults && !STATE._casRepaint) {
+      STATE._casRepaint = true;
+      showResults(STATE.lastResults.matches, STATE.lastResults.source, STATE.lastResults.unknownJournal, false);
+    }
+  } catch (e) {
+    // 静默降级：casCardBlock 在 STATE.cas 为空时整块不渲染，不影响其他库
+    console.warn('CAS data load failed:', e);
+  }
+}
+
 async function loadEiData() {
   try {
     const resp = await fetch('ei_data.json');
     if (!resp.ok) throw new Error('EI data fetch failed: ' + resp.status);
     const wrap = await resp.json();
 
-    let d;
-    if (wrap.gz) {
+    let d;    if (wrap.gz) {
       const b64 = Array.isArray(wrap.gz) ? wrap.gz.join('') : wrap.gz;
       const bin = atob(b64);
       const bytes = new Uint8Array(bin.length);
@@ -868,6 +988,69 @@ function showSuggestions(results) {
 }
 
 // ==================== DOI Lookup ====================
+// CrossRef 是主通道，但国内网络下 api.crossref.org 常超时，而 PDF 里的 DOI 是最稳定的一条线索。
+// 因此额外维护两张离线表：
+//   ① DOI 前缀 → 出版社家族（doiPublisher）—— 补一句可信来源提示；
+//   ② DOI 前缀 + 刊名关键词 → 候选刊名（doiPrefixJournals）—— CrossRef 不可用时兜底。
+// ② 只放「前缀即唯一刊」的强规则（如 10.1038/s41598 → Scientific Reports），
+// 不做模糊猜测：分区是强结论，猜错比查不到更糟。
+const DOI_PREFIX_PUB = {
+  '10.1038': { pub: 'Springer Nature', hint: 'Nature 系列（含 Scientific Reports / npj 系列）' },
+  '10.1016': { pub: 'Elsevier', hint: 'Elsevier 系列' },
+  '10.3390': { pub: 'MDPI', hint: 'MDPI 系列' },
+  '10.1007': { pub: 'Springer', hint: 'Springer 系列' },
+  '10.1002': { pub: 'Wiley', hint: 'Wiley 系列（含 Advanced 系列）' },
+  '10.1111': { pub: 'Wiley', hint: 'Wiley 系列' },
+  '10.1021': { pub: 'ACS', hint: 'American Chemical Society' },
+  '10.1080': { pub: 'Taylor & Francis', hint: 'Taylor & Francis 系列' },
+  '10.1061': { pub: 'ASCE', hint: 'American Society of Civil Engineers' },
+  '10.1680': { pub: 'ICE Publishing', hint: 'Institution of Civil Engineers' },
+  '10.14359': { pub: 'ACI', hint: 'American Concrete Institute' },
+  '10.1520': { pub: 'ASTM', hint: 'ASTM International' },
+  '10.1109': { pub: 'IEEE', hint: 'IEEE 系列' },
+  '10.1029': { pub: 'AGU', hint: 'American Geophysical Union' },
+  '10.1017': { pub: 'Cambridge University Press', hint: 'Cambridge 系列' },
+  '10.1093': { pub: 'Oxford University Press', hint: 'Oxford 系列' },
+  '10.1177': { pub: 'SAGE', hint: 'SAGE 系列' },
+  '10.1155': { pub: 'Wiley (原 Hindawi)', hint: 'Hindawi 系列' }
+};
+function doiPublisher(doi) {
+  const m = String(doi || '').match(/^(10\.\d{4,5})\//);
+  return m ? (DOI_PREFIX_PUB[m[1]] || null) : null;
+}
+
+// DOI 前缀（含期刊级子串）→ 确定刊名。仅收录「该前缀就是这一本刊」的情况。
+// 判据来自 DOI 注册规则：MDPI/SciRep 等出版社会把刊名缩写编进 DOI 主体。
+// 例：10.3390/polym17202731 → 前缀 10.3390 + 主体以 polym 开头 → Polymers。
+// 这张表只解决「CrossRef 挂了 + PDF 无 ISSN 无刊名」的极端情况，条目少而精。
+const DOI_PREFIX_JOURNAL = [
+  // MDPI 系列（主体前 4 位是刊缩写）
+  { re: /^10\.3390\/polym/i,   name: 'Polymers' },
+  { re: /^10\.3390\/ma\d/i,    name: 'Materials' },
+  { re: /^10\.3390\/app\d/i,   name: 'Applied Sciences-Basel' },
+  { re: /^10\.3390\/buildings/i, name: 'Buildings' },
+  { re: /^10\.3390\/su\d/i,    name: 'Sustainability' },
+  { re: /^10\.3390\/molecules/i, name: 'Molecules' },
+  { re: /^10\.3390\/jcs\b/i,   name: 'Journal of Composites Science' },
+  { re: /^10\.3390\/fibers/i,  name: 'Fibers' },
+  { re: /^10\.3390\/min/i,     name: 'Minerals' },
+  { re: /^10\.3390\/en\d/i,    name: 'Energies' },
+  { re: /^10\.3390\/rs\d/i,    name: 'Remote Sensing' },
+  { re: /^10\.3390\/s\d/i,     name: 'Sensors' },
+  { re: /^10\.3390\/w\d/i,     name: 'Water' },
+  // Springer Nature（每条都已对照 2025 分区表核验存在，避免反推出分区表里没有的刊名）
+  { re: /^10\.1038\/s41598/i,  name: 'Scientific Reports' },
+  { re: /^10\.1038\/s41524/i,  name: 'npj Computational Materials' },
+  { re: /^10\.1038\/s43246/i,  name: 'Communications Materials' },
+  { re: /^10\.1038\/s41467/i,  name: 'Nature Communications' }
+];
+// 由 DOI 反推刊名（离线）。命中返回刊名字符串，否则 ''。
+function journalFromDoi(doi) {
+  const d = String(doi || '').trim();
+  for (const r of DOI_PREFIX_JOURNAL) if (r.re.test(d)) return r.name;
+  return '';
+}
+
 async function lookupDoi(doi) {
   const clean = doi.trim().replace(/^https?:\/\/doi\.org\//i, '');
   if (!clean) return null;
@@ -884,15 +1067,28 @@ async function lookupDoi(doi) {
     const data = await resp.json();
     const msg = data.message;
     
+    // CrossRef 偶有 container-title 缺失，此时用离线反推补
+    const crossrefJournal = msg['container-title'] ? msg['container-title'][0] : '';
     return {
       title: msg.title ? msg.title[0] : '',
-      journal: msg['container-title'] ? msg['container-title'][0] : '',
-      issn: msg.ISSN ? msg.ISSN[0] : '',
-      doi: msg.DOI || clean
+      journal: crossrefJournal || journalFromDoi(clean),
+      // CrossRef 的 ISSN 数组里可能混 E-ISSN 在前，全带上供 CAS 按 ISSN 精确命中
+      issn: msg.ISSN && msg.ISSN.length ? msg.ISSN[0] : '',
+      issnAll: msg.ISSN || [],
+      doi: msg.DOI || clean,
+      _crossref: true
     };
   } catch(e) {
     console.error('CrossRef error:', e);
-    return null;
+    // 网络兜底：用 DOI 前缀反推刊名（离线表），再补一条出版社提示。
+    // 这样即使 CrossRef 不通，分区区块依然能出结果 —— 对国内网络很关键。
+    const guess = journalFromDoi(clean);
+    const p = doiPublisher(clean);
+    if (!guess && !p) return null;
+    return {
+      title: '', journal: guess, issn: '', issnAll: [], doi: clean,
+      _pubHint: p, _crossref: false, _fromDoiPrefix: !!guess
+    };
   }
 }
 
@@ -1073,17 +1269,45 @@ async function parsePdf(file) {
       const doiMatch = firstPageText.match(/10\.\d{4,}\/[\w.\-+/()]+/i);
       if (doiMatch) doi = doiMatch[0];
     }
-    
+
+    // ISSN 从正文页眉页脚挖（很多刊把 "ISSN 1234-5678" 印在版口）。
+    // 分区表以 ISSN 为一等主键，这条线索比刊名可靠得多，必须收。
+    // 只取页眉页脚区，别扫全文 —— 正文里的参考文献会带一堆别刊的 ISSN，
+    // 一旦采信就会把 A 刊的论文算成 B 刊分区，这是最坏的错法。
+    const issnZone = zones.map(z => (z.head + ' ' + z.foot)).join('\n');
+    const issnFound = [];
+    const issnRe = /\b(\d{4}-\d{3}[\dXx])\b/g;
+    let im;
+    while ((im = issnRe.exec(issnZone)) && issnFound.length < 4) {
+      const v = im[1].toUpperCase();
+      if (!issnFound.includes(v)) issnFound.push(v);
+    }
+    const metaIssn = String(info.ISSN || '').trim();
+
+    // 元数据刊名要过一道「像不像刊名」的筛子。实测不少 MDPI / 部分 Elsevier PDF
+    // 把 /Subject 或 /Journal 写成了摘要首句，直接当刊名去匹配会到处撞出错误结果。
+    const looksLikeJournalName = (s) => {
+      const t = String(s || '').trim();
+      if (!t || t.length > 80) return false;
+      if (/^10\.\d{4,}\//.test(t)) return false;
+      // 句末标点 + 长句 = 多半是摘要/正文，不是刊名
+      if (t.split(/\s+/).length > 12) return false;
+      if (/[.!?]\s*$/.test(t) && t.split(/\s+/).length > 6) return false;
+      return true;
+    };
+
     // Extract journal name from multiple possible metadata fields
     // /Subject often contains "Journal Name, doi:..." (Springer/Elsevier PDFs)
     let journal = info['Journal'] || info['Container-title'] || info['PrismPublicationName'] || '';
+    if (journal && !looksLikeJournalName(journal)) journal = '';
     let subjectJournal = '';
     if (!journal && info.Subject) {
       // Subject format: "npj Materials Sustainability, doi:10.1038/..."
       const subjParts = info.Subject.split(',');
       const firstPart = subjParts[0].trim();
       // Check if it looks like a journal name (not a DOI)
-      if (firstPart && !firstPart.startsWith('doi:') && !/^10\.\d{4,}\//.test(firstPart)) {
+      if (firstPart && !firstPart.startsWith('doi:') && !/^10\.\d{4,}\//.test(firstPart)
+          && looksLikeJournalName(firstPart)) {
         subjectJournal = firstPart;
         journal = firstPart;
       }
@@ -1097,7 +1321,8 @@ async function parsePdf(file) {
     return {
       title: info.Title || '',
       journal: journal,
-      issn: info.ISSN || '',
+      issn: metaIssn || (issnFound[0] || ''),
+      issnFound: issnFound,
       doi: doi || '',
       firstPageText: firstPageText,
       headText: headText
@@ -1115,13 +1340,14 @@ function renderCard(m, extraClass = '') {
   const csHit = findCs(name);          // 南大核心联查
   const cdHit = findCscd(name);        // 中科院 CSCD 联查
   const eiLk = eiLookup(name, issn);   // EI Compendex 联查（ISSN 优先，刊名兜底）
+  const casHit = findCas(name, issn, m[9]);  // 中科院分区 2025 联查（ISSN 优先，刊名兜底，DOI 前缀末位兜底）
   const xrColorClass = xrQ ? (xrQ === '1区' ? 'badge-q1' : xrQ === '2区' ? 'badge-q2' : xrQ === '3区' ? 'badge-q3' : 'badge-q4') : '';
   const jcrColorClass = jcrQ ? 'badge-' + jcrQ.toLowerCase() : '';
   const wosBadge = wosIdx ? wosIdx.split(' | ').map(i => `<span style="display:inline-block;background:#e8f5e9;color:#2e7d32;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;margin:0 2px">${i}</span>`).join('') : '';
   const wosSubjShort = wosSubj ? wosSubj.split(' | ').slice(0, 3).join(' · ') : '';
   
   let h = `<div class="result-card ${extraClass}"${extraClass ? ' style="display:none"' : ''}>
-    <div class="result-title">${esc(name)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}${eiTitleBadge(eiLk)}</div>
+    <div class="result-title">${esc(name)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}${eiTitleBadge(eiLk)}${casTitleBadge(casHit)}</div>
     <div class="result-issn">${issn ? 'ISSN ' + issn : ''}${wosBadge ? '  ' + wosBadge : ''}</div>
     <div class="result-grid">`;
   if (xrCat || xrQ) {
@@ -1153,7 +1379,11 @@ function renderCard(m, extraClass = '') {
       <div class="value" style="font-size:12px;font-weight:400;color:var(--sub)">${esc(wosSubjShort)}</div>
     </div>`;
   }
-  h += `</div></div>`;
+  h += `</div>`;
+  // 中科院分区独立成块，放在网格之外 —— 它是一套独立分区体系，
+  // 塞进新锐/JCR 的同一张网格里会让人误以为是同一套口径下的字段。
+  h += casCardBlock(casHit, name, issn);
+  h += `</div>`;
   return h;
 }
 
@@ -1213,10 +1443,14 @@ function showResults(matches, source = '', unknownJournal = null, append = false
     const cdCand = cscdCandidates(rawName);
     const eiLkU = eiLookup(rawName, unknownJournal.issn);
     const eiLkHas = !!(eiLkU && !eiLkU.disc);   // 停收不算「现役收录」，文案走未收录分支并附停止收录说明
+    // ISSN 候选：CrossRef 给的 + PDF 页眉页脚挖到的，全部交给分区库试
+    const issnCandsU = [unknownJournal.issn, ...(unknownJournal.issnFound || []),
+                        ...(unknownJournal.issnAll || [])].filter(Boolean);
+    const casHitU = findCas(rawName, issnCandsU, unknownJournal.doi);   // 中科院分区 2025
     const zhEdge = cnHit ? '#c0392b' : ((csHit || csCand.length) ? '#1a5c9e' : (eiLkHas ? '#9a6b12' : ((cdHit || cdCand.length) ? '#1e6f5c' : '#e67e22')));
     
     let html = `<div class="result-card" style="border-left:3px solid ${zhEdge}">
-      <div class="result-title">${jn || '未知期刊'}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}${eiTitleBadge(eiLkU)}</div>
+      <div class="result-title">${jn || '未知期刊'}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}${eiTitleBadge(eiLkU)}${casTitleBadge(casHitU)}</div>
       <div class="result-issn">${doi ? 'DOI: ' + doi : ''}</div>`;
     if (title) html += `<div style="font-size:12px;color:var(--sub);margin-bottom:12px;line-height:1.4">${title}</div>`;
     
@@ -1237,7 +1471,8 @@ function showResults(matches, source = '', unknownJournal = null, append = false
     </div>
     <div style="margin-top:12px;padding:8px 10px;background:${cnHit ? '#fdf3f2' : ((csHit || csCand.length) ? '#eef4fb' : ((cdHit || cdCand.length) ? '#e9f3f0' : (eiLkHas ? '#fdf6e8' : '#fef9f0')))};border-radius:8px;font-size:12px;color:${zhEdge};line-height:1.5">
       ${zhFallbackNote({ cnHit, csHit, csCand, cdHit, cdCand, eiLk: eiLkU })}
-    </div></div>`;
+    </div>
+    ${casCardBlock(casHitU, rawName, issnCandsU)}</div>`;
     
     if (source) {
       html = `<div style="font-size:12px;color:var(--sub);margin-bottom:8px">${source}</div>` + html;
@@ -1640,6 +1875,243 @@ function cscdTitleBadge(cscdHit) {
   return cscdHit[1] === 1
     ? '<span class="badge-cscd-ext" style="font-size:10px;padding:2px 6px;margin-left:4px">CSCD扩展</span>'
     : '<span class="badge-cscd" style="font-size:10px;padding:2px 6px;margin-left:4px">CSCD核心</span>';
+}
+
+
+// ==================== 中科院分区（2025 年升级版） ====================
+// 数据源为三份官方表的交叉合并（见 build_cas_data.py）：
+//   ① 完整版主表（刊名/分区/Top/OA）—— 权威口径
+//   ② 大类划分表（刊名/ISSN/EISSN/数据库/大类/大类英文/出版社）
+//   ③ 分类表 12 个学科 sheet（分区兜底）+ 巨型期刊 + IF<20
+// 行结构（下方 casRow 的字段序）：
+//   [0]刊名 [1]大类 [2]分区"1"-"4" [3]Top(0/1) [4]OA(0/1) [5]ISSN [6]EISSN
+//   [7]数据库 [8]出版社 [9]巨型期刊(0/1)
+//
+// 与前三库（北大/南大/CSCD）的差异：
+//   1) 这是一套「分区」而非「收录」，故展示上单独成块，绝不与新锐分区、JCR 分区混排；
+//   2) 以 ISSN 为一等主键 —— 22k 条里 ISSN 覆盖率约 99%，而英文刊名写法千奇百怪，
+//      且 PDF 页眉常有截断，ISSN 比刊名稳得多；
+//   3) 刊名匹配刻意保守：分区是强结论，宁可返回 null 走「未命中」也不猜。
+// 刊名归一化：在 normalizeCn 基础上把 & 与 and 打通。
+// 必须做这一步 —— 分区表里大量刊名官方写法带 &（如「CEMENT & CONCRETE COMPOSITES」），
+// 而 CrossRef / PDF 页眉常写成 "and"，不归一就会漏掉整本刊。
+// 与 CSCD 的 cscdKey 保持同一口径。
+function casKey(s) {
+  return normalizeCn(String(s || '').replace(/&amp;/gi, '&')).replace(/&/g, 'and');
+}
+
+// 单条访存器，避免到处写魔法下标
+function casRow(j) {
+  return {
+    name: j[0] || '', cat: j[1] || '', zone: j[2] || '',
+    top: j[3] === 1, oa: j[4], issn: j[5] || '', eissn: j[6] || '',
+    db: j[7] || '', pub: j[8] || '', giant: j[9] === 1
+  };
+}
+
+// 按 ISSN 直查（最可靠通道）。cleanIssn 只留数字与 X。
+function findCasByIssn(issn) {
+  const cas = STATE.cas;
+  if (!cas || !issn) return null;
+  const k = String(issn).replace(/[^0-9Xx]/g, '').toUpperCase();
+  if (k.length !== 8) return null;
+  const hit = cas.issnMap.get(k);
+  return hit !== undefined ? cas.journals[hit] : null;
+}
+
+// 按刊名匹配，三级放宽、每级都设防误判门槛。
+// 命中返回行（原始数组），否则 null。
+function findCasByName(name) {
+  const cas = STATE.cas;
+  if (!cas || !cas.casMap || !name) return null;
+  const raw = String(name);
+  const key = casKey(raw);
+  if (!key) return null;
+
+  // 1) 归一化后精确匹配
+  const hit = cas.casMap.get(key);
+  if (hit !== undefined) return cas.journals[hit];
+
+  // 2) 剥掉尾部括号补充说明（如 "Nature (London)" / "Cell (Cambridge, Mass.)"）后再试
+  const stripped = casKey(raw.replace(/[（(【\[][^）)】\]]{1,30}[）)】\]]/g, ''));
+  if (stripped && stripped !== key) {
+    const h2 = cas.casMap.get(stripped);
+    if (h2 !== undefined) return cas.journals[h2];
+  }
+
+  // 3) 纯西文刊名门槛 6 —— 4 个字母的英文串（Cell/ACS Nano 之类虽短但稀见，
+  //    更常见的是 "the"/"and" 残留）在正文页眉里太容易撞上，误报代价高于漏报。
+  const minLen = /^[\x00-\x7f]+$/.test(key) ? 6 : 4;
+  if (key.length < minLen) return null;
+
+  // 3a) 库中刊名以查询串开头（查询串是缩写/截断）：唯一才认
+  let cand = null, n = 0;
+  const names = cas.names, J = cas.journals;
+  for (let i = 0, len = names.length; i < len; i++) {
+    const nm = names[i];
+    if (!nm || nm.length < minLen) continue;
+    if (nm.startsWith(key)) { cand = J[i]; if (++n > 1) return null; }
+  }
+  if (n === 1) return cand;
+
+  // 3b) 查询串以库中刊名开头（查询串尾部有残留，如页眉串了卷期号）：
+  //     取最长匹配，并列则不认
+  let best = null, bestLen = 0, tie = false;
+  for (let i = 0, len = names.length; i < len; i++) {
+    const nm = names[i];
+    if (!nm || nm.length < minLen) continue;
+    if (key.startsWith(nm)) {
+      if (nm.length > bestLen) { best = J[i]; bestLen = nm.length; tie = false; }
+      else if (nm.length === bestLen) tie = true;
+    }
+  }
+  return (best && !tie) ? best : null;
+}
+
+// 统一入口：ISSN 优先，刊名兜底，最后用 DOI 前缀离线反推。返回 {row, via} 或 null。
+// via 记录命中通道，供 UI 提示精度：
+//   issn —— 最可靠（分区表以 ISSN 为主键）
+//   name —— 刊名匹配，次之
+//   doi  —— 由 DOI 前缀推定，精度最低，UI 必须标注
+// issn 允许传数组或用逗号/分号分隔的串 —— CrossRef 同时给 PRINT 与 E-ISSN，
+// 分区表里有些刊只登记了其中一个，全试一遍能明显提高命中率。
+function findCas(name, issn, doi) {
+  const list = Array.isArray(issn)
+    ? issn
+    : String(issn || '').split(/[,;\s]+/).filter(Boolean);
+  for (const x of list) {
+    const byIssn = findCasByIssn(x);
+    if (byIssn) return { row: byIssn, via: 'issn' };
+  }
+  const byName = findCasByName(name);
+  if (byName) return { row: byName, via: 'name' };
+  // 离线兜底：CrossRef 不通、PDF 又没 ISSN/刊名时，DOI 前缀是唯一线索
+  if (doi) {
+    const g = journalFromDoi(doi);
+    if (g) {
+      const byDoi = findCasByName(g);
+      if (byDoi) return { row: byDoi, via: 'doi' };
+    }
+  }
+  return null;
+}
+
+// 同名候选：刊名能命中多本时列出，避免「未命中 → 报未收录」这种事实性误报。
+// 北大/南大/CSCD 都做了这件事，分区是更强结论，更该做。
+function casCandidates(name) {
+  const cas = STATE.cas;
+  if (!cas || !cas.casMap || !name) return [];
+  const raw = String(name).trim();
+  const key = casKey(raw);
+  if (!key || key.length < 5) return [];
+  if (cas.casMap.get(key) !== undefined) return [];   // 已能精确命中，无需候选
+  const out = [];
+  for (let i = 0, len = cas.journals.length; i < len; i++) {
+    const full = (cas.journals[i][0] || '').trim();
+    if (!full) continue;
+    if (casKey(full).startsWith(key)) out.push(cas.journals[i]);
+    if (out.length > 6) break;
+  }
+  return out.length > 1 ? out : [];
+}
+
+// 分区配色：与站点其他配色体系无关，采用「1区最红 → 4区最灰」的常识映射。
+// 注意这是中国学术语境的「红=高」，与股票红涨绿跌同源，非西方习惯。
+function casZoneClass(z) {
+  return z === '1' ? 'cas-z1' : z === '2' ? 'cas-z2' : z === '3' ? 'cas-z3' : 'cas-z4';
+}
+
+// 卡片内的中科院分区区块（PDF / DOI / 刊名搜索 / 批量共用）。
+// hit 为 findCas 的返回（{row, via}）或 null。
+// via 可为 'issn' | 'name' | 'doi' —— 'doi' 表示由 DOI 前缀离线反推，精度略低，需在 UI 标注。
+function casCardBlock(hit, name, issn) {
+  const cas = STATE.cas;
+  if (!cas) return '';   // 数据未就绪时整块不显示，避免误报「未收录」
+
+  // 未命中：先看是否有同名候选（歧义 ↔ 未收录 是两件事）
+  if (!hit) {
+    const cands = casCandidates(name);
+    if (cands.length) {
+      const list = cands.map(r => {
+        const c = casRow(r);
+        return `<div style="margin-top:3px">· <b>${esc(c.name)}</b> —— 中科院 ${c.zone} 区 · ${esc(c.cat || '大类不详')}${c.top ? ' · Top' : ''}${c.issn ? '（ISSN ' + esc(c.issn) + '）' : ''}</div>`;
+      }).join('');
+      return `<div class="cas-block">
+        <div class="cas-block-head"><span class="t">中科院分区</span><span class="v">${esc(cas.version)} 升级版</span></div>
+        <div class="cas-block-body">
+          <div class="cas-cell full">
+            <div class="k">刊名歧义 · 未做归属</div>
+            <div class="v" style="font-size:12px;font-weight:400;color:#8a6512">⚠ 分区表中有 ${cands.length} 本刊名以该串开头，请补全刊名或改用 ISSN 确认：</div>
+            <div style="font-size:11px;color:#8a6512;font-weight:400;line-height:1.6;margin-top:4px">${list}</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    // 真正未命中。但若查询串本身就是一本非 SCIE 的刊（如中文刊、ESCI 刊），
+    // 说「未收录」是准确的 —— 2025 分区表只覆盖 SCIE/SSCI/AHCI 等。
+    return `<div class="cas-miss">
+      <b>中科院分区</b>　该刊未出现在 2025 年中科院分区表（升级版）中 —— 该表仅覆盖 SCIE / SSCI / AHCI 收录期刊；中文刊、ESCI-only 刊不在其列。具体认定请以本单位规定为准。
+    </div>`;
+  }
+
+  const c = casRow(hit.row);
+  const catName = c.cat || '大类不详';
+  const tags = [];
+  if (c.top) tags.push('<span class="cas-tag top">TOP 期刊</span>');
+  if (c.oa === 1) tags.push('<span class="cas-tag oa">Open Access</span>');
+  if (c.giant) tags.push('<span class="cas-tag giant">巨型期刊</span>');
+  if (c.db) tags.push(`<span class="cas-tag">${esc(c.db)}</span>`);
+  const issnShown = c.issn || c.eissn || '';
+  const viaNote = hit.via === 'issn' ? '' : (hit.via === 'doi' ? '（由 DOI 前缀推定）' : '（按刊名匹配）');
+  // 由 DOI 前缀推定出来的结果，明确标注出处 —— 不能让用户以为是直接读到的刊名
+  const viaWarn = hit.via === 'doi'
+    ? `<div class="cas-foot" style="background:#fdf6e8;color:#8a6512;border-top-color:#f0dcbe">
+         命中方式：本刊由论文 DOI 前缀离线推定。CrossRef 与 PDF 元数据均未提供可用刊名，
+         故按出版社会员的 DOI 编码规则反推 —— 建议核对上方刊名是否为该论文实际发表刊物。
+       </div>`
+    : '';
+
+  return `<div class="cas-block">
+    <div class="cas-block-head">
+      <span class="t">中科院分区</span>
+      <span class="v">${esc(cas.version)} 升级版${viaNote ? ' · ' + viaNote : ''}</span>
+    </div>
+    <div class="cas-block-body">
+      <div class="cas-cell">
+        <div class="k">大类分区</div>
+        <div class="v"><span class="cas-zone ${casZoneClass(c.zone)}">${c.zone} 区</span></div>
+      </div>
+      <div class="cas-cell">
+        <div class="k">大类学科</div>
+        <div class="v" style="font-size:14px">${esc(catName)}</div>
+      </div>
+      <div class="cas-cell full">
+        <div class="k">期刊属性</div>
+        <div class="v" style="font-size:12px;font-weight:400">
+          <div class="cas-tags">${tags.join('') || '<span style="color:#bbb">无附加属性</span>'}</div>
+        </div>
+      </div>
+      <div class="cas-cell full">
+        <div class="k">期刊信息</div>
+        <div class="v" style="font-size:12px;font-weight:400;color:var(--sub);line-height:1.6">
+          ${issnShown ? 'ISSN ' + esc(issnShown) + (c.eissn && c.issn ? ' &nbsp;·&nbsp; E-ISSN ' + esc(c.eissn) : '') : 'ISSN 未提供'}
+          ${c.pub ? '<br>出版社：' + esc(c.pub) : ''}
+        </div>
+      </div>
+    </div>
+    <div class="cas-foot">
+      数据来源：2025 年中科院文献情报中心期刊分区表（升级版）· 大类分区口径。与本页「新锐分区」「JCR 分区」为三套独立体系，认定时请明确所用口径。
+    </div>
+    ${viaWarn}
+  </div>`;
+}
+
+// 标题旁的紫色徽标：只标分区档位，详细属性让区块去讲
+function casTitleBadge(hit) {
+  if (!hit) return '';
+  const c = casRow(hit.row);
+  return `<span class="badge-cas" style="font-size:10px;padding:2px 6px;margin-left:4px">中科院 ${c.zone} 区</span>` +
+    (c.top ? '<span class="badge-cas-top" style="font-size:10px;padding:2px 5px;margin-left:2px">TOP</span>' : '');
 }
 
 
@@ -2101,15 +2573,17 @@ function zhFindInText(text) {
 
 // 正文兜底识别（北大 + 南大 + CSCD 联合）。命中则直接出结果并返回 true。
 function zhTextFallback(info, source, appendMode) {
-  if (!info || (!STATE.cn && !STATE.cs && !STATE.cscd && !STATE.ei)) return false;
+  if (!info || (!STATE.cn && !STATE.cs && !STATE.cscd && !STATE.ei && !STATE.cas)) return false;
   const text = info.headText || info.firstPageText || '';
   if (!text) return false;
 
   const nm = zhFindInText(text);
   if (!nm) return false;
   const cnHit = findCn(nm), csHit = findCs(nm), cdHit = findCscd(nm);
-  const eiLk = eiLookup(nm, info.issn);
-  if (!cnHit && !csHit && !cdHit && !eiLk && !csCandidates(nm).length && !cscdCandidates(nm).length) return false;
+  const issnCandsZ = [info.issn, ...(info.issnFound || [])].filter(Boolean);
+  const eiLk = eiLookup(nm, issnCandsZ[0] || '');
+  const casHit = findCas(nm, issnCandsZ, info.doi);
+  if (!cnHit && !csHit && !cdHit && !eiLk && !casHit && !csCandidates(nm).length && !cscdCandidates(nm).length) return false;
 
   const srcX = `PDF正文识别: ${esc(nm)}`;
   const mX = searchJournals(nm);
@@ -2127,14 +2601,15 @@ function zhTextFallback(info, source, appendMode) {
 
   // 新锐库里没有，但至少一个中文库有 → 直接出中文卡片，避免误报「未收录」
   if (appendMode) {
-    const edge = cnHit ? '#c0392b' : (csHit ? '#1a5c9e' : (eiLk ? '#9a6b12' : '#1e6f5c'));
+    const edge = cnHit ? '#c0392b' : (csHit ? '#1a5c9e' : (eiLk ? '#9a6b12' : (cdHit ? '#1e6f5c' : '#6b4ea8')));
     $('results').insertAdjacentHTML('beforeend',
       `<div class="result-card" style="border-left:3px solid ${edge};margin-bottom:12px">
-        <div class="result-title">${esc(nm)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}${eiTitleBadge(eiLk)}</div>
+        <div class="result-title">${esc(nm)}${cnTitleBadge(cnHit)}${csTitleBadge(csHit)}${cscdTitleBadge(cdHit)}${eiTitleBadge(eiLk)}${casTitleBadge(casHit)}</div>
         <div class="result-grid">${cnCardBlock(cnHit)}${csCardBlock(csHit, nm)}${cscdCardBlock(cdHit, nm)}${eiCardBlock(eiLk, nm)}</div>
+        ${casCardBlock(casHit, nm, issnCandsZ)}
       </div>`);
   } else {
-    showResults([], srcX, { journal: nm, title: info.title });
+    showResults([], srcX, { journal: nm, title: info.title, issn: info.issn });
   }
   return true;
 }
@@ -2562,7 +3037,7 @@ $$('.mode-btn').forEach(btn => {
     STATE.mode = btn.dataset.mode;
     $$('.mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['modeName','modeDoi','modePdf','modeCn'].forEach(id => $(id).classList.add('hidden'));
+    ['modeName','modeDoi','modePdf','modeCn','modeCas'].forEach(id => $(id).classList.add('hidden'));
     $(`mode${STATE.mode.charAt(0).toUpperCase() + STATE.mode.slice(1)}`).classList.remove('hidden');
     $('suggestions').classList.remove('show');
     $('results').innerHTML = '';
@@ -2577,6 +3052,14 @@ $$('.mode-btn').forEach(btn => {
       $('cnBrowseBtn').textContent = '按学科';
       updateZhStat();
       $('cnInput').focus();
+    }
+    if (STATE.mode === 'cas') {
+      $('casSuggestions').classList.remove('show');
+      $('casCatsArea').classList.add('hidden');
+      $('casCatsArea').dataset.rendered = '';
+      $('casCatsBtn').textContent = '按大类';
+      updateCasStat();
+      $('casInput').focus();
     }
   });
 });
@@ -2827,6 +3310,175 @@ $('cnSuggestions').addEventListener('click', function(e) {
   }
 });
 
+// ==================== 中科院分区（2025）浏览 / 查询 ====================
+function updateCasStat() {
+  const cas = STATE.cas;
+  const el = $('casStat');
+  if (!el) return;
+  el.textContent = cas
+    ? `2025 年中科院期刊分区表（升级版）· ${cas.total.toLocaleString()} 种 · ${cas.cats.length} 个大类`
+    : '2025 年中科院期刊分区表（升级版）· 加载中…';
+}
+
+// 输入建议：归一化前缀匹配，最多 20 条
+function searchCasJournals(q, limit = 20) {
+  const cas = STATE.cas;
+  if (!cas || !q || q.length < 2) return [];
+  const key = casKey(q);
+  const digits = String(q).replace(/[^0-9Xx]/g, '').toUpperCase();
+  const out = [];
+  const names = cas.names, J = cas.journals;
+  for (let i = 0; i < J.length && out.length < limit; i++) {
+    const nm = names[i];
+    if (!nm) continue;
+    let hit = nm.indexOf(key) !== -1;
+    if (!hit && digits.length === 8) {
+      const a = (J[i][5] || '').replace(/[^0-9Xx]/g, '').toUpperCase();
+      const b = (J[i][6] || '').replace(/[^0-9Xx]/g, '').toUpperCase();
+      hit = a === digits || b === digits;
+    }
+    if (hit) out.push(J[i]);
+  }
+  // 精确/前缀优先，其余按刊名长度
+  out.sort((a, b) => {
+    const ka = casKey(a[0]), kb = casKey(b[0]);
+    const ra = ka === key ? 0 : ka.startsWith(key) ? 1 : 2;
+    const rb = kb === key ? 0 : kb.startsWith(key) ? 1 : 2;
+    if (ra !== rb) return ra - rb;
+    return (a[1] || '').localeCompare(b[1] || '');
+  });
+  return out;
+}
+
+// 单条分区结果卡
+function casResultCard(row) {
+  const c = casRow(row);
+  const tags = [];
+  if (c.top) tags.push('<span class="cas-tag top">TOP 期刊</span>');
+  if (c.oa === 1) tags.push('<span class="cas-tag oa">Open Access</span>');
+  if (c.giant) tags.push('<span class="cas-tag giant">巨型期刊</span>');
+  if (c.db) tags.push(`<span class="cas-tag">${esc(c.db)}</span>`);
+  return `<div class="result-card" style="border-left:3px solid #6b4ea8">
+    <div class="result-title">${esc(c.name)}<span class="badge-cas" style="font-size:10px;padding:2px 6px;margin-left:4px">中科院 ${c.zone} 区</span>${c.top ? '<span class="badge-cas-top" style="font-size:10px;padding:2px 5px;margin-left:2px">TOP</span>' : ''}</div>
+    <div class="result-issn">${c.issn ? 'ISSN ' + esc(c.issn) : ''}${c.eissn && c.eissn !== c.issn ? '  ·  E-ISSN ' + esc(c.eissn) : ''}</div>
+    <div class="cas-block" style="margin-top:10px">
+      <div class="cas-block-head"><span class="t">中科院分区</span><span class="v">${esc(STATE.cas.version)} 升级版</span></div>
+      <div class="cas-block-body">
+        <div class="cas-cell"><div class="k">大类分区</div><div class="v"><span class="cas-zone ${casZoneClass(c.zone)}">${c.zone} 区</span></div></div>
+        <div class="cas-cell"><div class="k">大类学科</div><div class="v" style="font-size:14px">${esc(c.cat || '大类不详')}</div></div>
+        <div class="cas-cell full"><div class="k">期刊属性</div><div class="v" style="font-size:12px;font-weight:400"><div class="cas-tags">${tags.join('') || '<span style="color:#bbb">无附加属性</span>'}</div></div></div>
+        ${c.pub ? `<div class="cas-cell full"><div class="k">出版社</div><div class="v" style="font-size:12px;font-weight:400;color:var(--sub)">${esc(c.pub)}</div></div>` : ''}
+      </div>
+      <div class="cas-foot">数据来源：2025 年中科院文献情报中心期刊分区表（升级版）· 大类分区口径。与本页「新锐分区」「JCR 分区」为三套独立体系。</div>
+    </div>
+  </div>`;
+}
+
+function showCasResults(rows, src) {
+  const el = $('results');
+  $('emptyState').classList.add('hidden');
+  el.innerHTML = (src ? `<div style="font-size:12px;color:var(--sub);margin-bottom:8px">${src}</div>` : '')
+    + rows.map(casResultCard).join('');
+}
+
+// 按大类浏览（21 个大类，各带区数分布）
+function renderCasCats() {
+  const area = $('casCatsArea');
+  area.dataset.rendered = '1';
+  const cas = STATE.cas;
+  if (!cas) { area.innerHTML = '<div class="cn-disc-item" style="cursor:default;color:#999">数据加载中…</div>'; return; }
+  let h = '';
+  for (const cat of cas.cats) {
+    const n = cas.catCounts[cat] || 0;
+    if (!n) continue;
+    h += `<div class="cn-disc-item" data-cascat="${esc(cat)}" style="border-left:3px solid #6b4ea8">
+      <span>${esc(cat)}</span><span class="cn-disc-count">${n} 种</span>
+    </div>`;
+  }
+  area.innerHTML = h || '<div class="cn-disc-item" style="cursor:default;color:#999">暂无可浏览数据</div>';
+}
+
+function showCasCat(cat) {
+  const cas = STATE.cas;
+  if (!cas) return;
+  const rows = cas.journals.filter(j => j[1] === cat);
+  // 按分区升序（1 区在前）→ 刊名
+  rows.sort((a, b) => (a[2] || '9').localeCompare(b[2] || '9') || a[0].localeCompare(b[0]));
+  $('casCatsArea').classList.add('hidden');
+  $('casCatsBtn').textContent = '按大类';
+  $('casSuggestions').classList.remove('show');
+  showCasResults(rows, `${esc(cat)} · 共 ${rows.length} 种（按分区排序）`);
+}
+
+if ($('casInput')) {
+  $('casInput').addEventListener('input', debounce(function() {
+    const q = this.value.trim();
+    $('casClearBtn').classList.toggle('hidden', !q);
+    if (q.length < 2) { $('casSuggestions').classList.remove('show'); return; }
+    const res = searchCasJournals(q);
+    if (!res.length) { $('casSuggestions').classList.remove('show'); return; }
+    $('casSuggestions').innerHTML = res.map((j, i) =>
+      `<div class="sug-item" data-idx="${i}">
+        <div class="sug-name">${esc(j[0])}</div>
+        <div class="sug-meta"><span class="badge-cas">中科院 ${esc(j[2])} 区</span>
+          <span style="color:#888">${esc(j[1] || '')}</span>${j[3] === 1 ? ' <span class="badge-cas-top">TOP</span>' : ''}</div>
+      </div>`).join('');
+    $('casSuggestions').classList.add('show');
+    $('casSuggestions')._res = res;
+  }, 120));
+  $('casInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      const q = this.value.trim();
+      if (!q) return;
+      $('casSuggestions').classList.remove('show');
+      const res = searchCasJournals(q, 60);
+      if (res.length) {
+        showCasResults(res.length === 1 ? res : res.slice(0, 40), `查询「${esc(q)}」· 命中 ${res.length} 条`);
+      } else {
+        // 未命中：区分「真没有」与「同名歧义」
+        const cands = casCandidates(q);
+        if (cands.length) {
+          showCasResults(cands, `「${esc(q)}」有 ${cands.length} 本同名候选，请补全刊名或改用 ISSN`);
+        } else {
+          $('results').innerHTML = '';
+          $('emptyState').classList.remove('hidden');
+          showToast('未在 2025 中科院分区表中找到该刊');
+        }
+      }
+    }
+  });
+  $('casClearBtn').addEventListener('click', () => {
+    $('casInput').value = '';
+    $('casClearBtn').classList.add('hidden');
+    $('casSuggestions').classList.remove('show');
+    $('results').innerHTML = '';
+    $('emptyState').classList.remove('hidden');
+    $('casInput').focus();
+  });
+  $('casSuggestions').addEventListener('click', function(e) {
+    const item = e.target.closest('.sug-item');
+    if (!item) return;
+    const res = this._res || [];
+    const row = res[parseInt(item.dataset.idx, 10)];
+    if (row) showCasResults([row], '查询结果');
+    this.classList.remove('show');
+    $('casInput').blur();
+  });
+  $('casCatsBtn').addEventListener('click', () => {
+    const area = $('casCatsArea');
+    const willShow = area.classList.contains('hidden');
+    if (!area.dataset.rendered) renderCasCats();
+    area.classList.toggle('hidden', !willShow);
+    $('casSuggestions').classList.remove('show');
+    $('casCatsBtn').textContent = willShow ? '收起' : '按大类';
+  });
+  $('casCatsArea').addEventListener('click', e => {
+    const item = e.target.closest('.cn-disc-item');
+    if (!item || !item.dataset.cascat) return;
+    showCasCat(item.dataset.cascat);
+  });
+}
+
 // DOI search
 $('doiBtn').addEventListener('click', async () => {
   const doi = $('doiInput').value.trim();
@@ -2875,9 +3527,11 @@ async function doDoiSearch(doi) {
   // Fallback to broad search
   if (!matches.length && info.journal) matches = searchJournals(info.journal);
   
+  // CrossRef 有 ISSN 数组时全部用上：多带一个 ISSN 就可能多命中一次
+  const allIssn = (info.issnAll && info.issnAll.length) ? info.issnAll : [info.issn].filter(Boolean);
   const source = info.title ? `📄 ${esc(info.title)}<br>DOI: ${esc(doi)}` : `DOI: ${esc(doi)}`;
   if (!matches.length) {
-    showResults([], source, { journal: info.journal, title: info.title, doi: info.doi });
+    showResults([], source, { journal: info.journal, title: info.title, doi: info.doi, issn: allIssn[0] || '' });
   } else {
     showResults(matches, source);
   }
@@ -2988,7 +3642,7 @@ async function processPdf(file, idx = 1, total = 1) {
             <div style="font-size:15px;font-weight:600;margin-bottom:6px">没能确认这篇 PDF 的刊名</div>
             <div style="font-size:13px;color:var(--sub);line-height:1.6">
               ${readChars
-                ? `已读到 PDF 的文字（页眉页脚共 ${readChars} 字），但没能在北大核心 2023 年版的 1987 种、南大 CSSCI 的 935 种、中科院 CSCD 的 1501 种，以及 EI 的国内刊名录（中文刊专表 390 种，含国内办英文刊）里找到对应刊名。`
+                ? `已读到 PDF 的文字（页眉页脚共 ${readChars} 字），但没能在北大核心 2023 年版的 1987 种、南大 CSSCI 的 935 种、中科院 CSCD 的 1501 种、2025 年中科院分区表的 21730 种，以及 EI 的国内刊名录（中文刊专表 390 种，含国内办英文刊）里找到对应刊名。`
                 : `这个 PDF 里没有可提取的文字（多半是扫描件／图片版），页眉页脚读不出内容。`}<br><br>
               <span style="font-weight:500;color:var(--text)">可能的原因：</span><br>
               &nbsp;1.&nbsp; 该刊<span style="font-weight:500">既非北大中文核心，也不属于南大 CSSCI</span>（行业刊、内部刊等）<br>
@@ -3040,17 +3694,20 @@ async function processPdf(file, idx = 1, total = 1) {
           const cnHitA = findCn(crossrefInfo.journal || '');
           const csHitA = findCs(crossrefInfo.journal || '');
           const cdHitA = findCscd(crossrefInfo.journal || '');
-          const eiLkA = eiLookup(crossrefInfo.journal || '', crossrefInfo.issn);
+          const issnCandsA = [crossrefInfo.issn, ...(crossrefInfo.issnAll || []), ...(info.issnFound || [])].filter(Boolean);
+          const eiLkA = eiLookup(crossrefInfo.journal || '', issnCandsA[0] || '');
+          const casHitA = findCas(crossrefInfo.journal || '', issnCandsA, crossrefInfo.doi || info.doi);
           const edgeA = cnHitA ? '#c0392b' : (csHitA ? '#1a5c9e' : ((eiLkA && !eiLkA.disc) ? '#9a6b12' : (cdHitA ? '#1e6f5c' : '#e67e22')));
           $('results').insertAdjacentHTML('beforeend',
             `<div class="result-card" style="border-left:3px solid ${edgeA};margin-bottom:12px">
-              <div class="result-title">${esc(rawJ)}${cnTitleBadge(cnHitA)}${csTitleBadge(csHitA)}${cscdTitleBadge(cdHitA)}${eiTitleBadge(eiLkA)}</div>
+              <div class="result-title">${esc(rawJ)}${cnTitleBadge(cnHitA)}${csTitleBadge(csHitA)}${cscdTitleBadge(cdHitA)}${eiTitleBadge(eiLkA)}${casTitleBadge(casHitA)}</div>
               <div class="result-grid">
                 ${cnCardBlock(cnHitA)}${csCardBlock(csHitA, rawJ)}${cscdCardBlock(cdHitA, rawJ)}${eiCardBlock(eiLkA, rawJ)}
               </div>
+              ${casCardBlock(casHitA, rawJ, issnCandsA)}
             </div>`);
         } else {
-          showResults([], source, crossrefInfo);
+          showResults([], source, { ...crossrefInfo, issnFound: info.issnFound });
         }
         return;
       }
@@ -3067,18 +3724,22 @@ async function processPdf(file, idx = 1, total = 1) {
       const cnHitB = findCn(info.journal);
       const csHitB = findCs(info.journal);
       const cdHitB = findCscd(info.journal);
-      const eiLkB = eiLookup(info.journal, info.issn);
+      // ISSN 候选：元数据 ISSN + 页眉页脚挖到的，全带上
+      const issnCandsB = [info.issn, ...(info.issnFound || [])].filter(Boolean);
+      const eiLkB = eiLookup(info.journal, issnCandsB[0] || '');
+      const casHitB = findCas(info.journal, issnCandsB, info.doi);
       const edgeB = cnHitB ? '#c0392b' : (csHitB ? '#1a5c9e' : ((eiLkB && !eiLkB.disc) ? '#9a6b12' : (cdHitB ? '#1e6f5c' : '#e67e22')));
       if (appendMode) {
         $('results').insertAdjacentHTML('beforeend',
           `<div class="result-card" style="border-left:3px solid ${edgeB};margin-bottom:12px">
-            <div class="result-title">${esc(info.journal || info.title || '未知期刊')}${cnTitleBadge(cnHitB)}${csTitleBadge(csHitB)}${cscdTitleBadge(cdHitB)}${eiTitleBadge(eiLkB)}</div>
+            <div class="result-title">${esc(info.journal || info.title || '未知期刊')}${cnTitleBadge(cnHitB)}${csTitleBadge(csHitB)}${cscdTitleBadge(cdHitB)}${eiTitleBadge(eiLkB)}${casTitleBadge(casHitB)}</div>
             <div class="result-grid">
               ${cnCardBlock(cnHitB)}${csCardBlock(csHitB, info.journal)}${cscdCardBlock(cdHitB, info.journal)}${eiCardBlock(eiLkB, info.journal)}
             </div>
+            ${casCardBlock(casHitB, info.journal, issnCandsB)}
           </div>`);
       } else {
-        showResults([], source, { journal: info.journal, title: info.title, doi: info.doi });
+        showResults([], source, { journal: info.journal, title: info.title, doi: info.doi, issn: (issnCandsB && issnCandsB[0]) || info.issn });
       }
       return;
     }
@@ -3096,18 +3757,22 @@ async function processPdf(file, idx = 1, total = 1) {
     const cnHitC = findCn(info.journal);
     const csHitC = findCs(info.journal);
     const cdHitC = findCscd(info.journal);
-    const eiLkC = eiLookup(info.journal, info.issn);
+    const issnCandsC = [info.issn, ...(info.issnFound || [])].filter(Boolean);
+    const eiLkC = eiLookup(info.journal, issnCandsC[0] || '');
+    const casHitC = findCas(info.journal, issnCandsC, info.doi);
     const edgeC = cnHitC ? '#c0392b' : (csHitC ? '#1a5c9e' : ((eiLkC && !eiLkC.disc) ? '#9a6b12' : (cdHitC ? '#1e6f5c' : 'var(--border)')));
     if (appendMode) {
       $('results').insertAdjacentHTML('beforeend',
         `<div class="result-card" style="border-left:3px solid ${edgeC};margin-bottom:12px">
-          <div class="result-title">${esc(info.journal || info.title || '未识别期刊')}${cnTitleBadge(cnHitC)}${csTitleBadge(csHitC)}${cscdTitleBadge(cdHitC)}${eiTitleBadge(eiLkC)}</div>
+          <div class="result-title">${esc(info.journal || info.title || '未识别期刊')}${cnTitleBadge(cnHitC)}${csTitleBadge(csHitC)}${cscdTitleBadge(cdHitC)}${eiTitleBadge(eiLkC)}${casTitleBadge(casHitC)}</div>
           <div class="result-grid">
             ${cnCardBlock(cnHitC)}${csCardBlock(csHitC, info.journal)}${cscdCardBlock(cdHitC, info.journal)}${eiCardBlock(eiLkC, info.journal)}
           </div>
+          ${casCardBlock(casHitC, info.journal, issnCandsC)}
         </div>`);
     } else {
-      showResults([], source, info);
+      // 传入 issnFound，让分区区块能按页眉页脚挖到的 ISSN 命中
+      showResults([], source, { journal: info.journal, title: info.title, doi: info.doi, issn: issnCandsC[0] || '' });
     }
     return;
   }
